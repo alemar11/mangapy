@@ -1,16 +1,16 @@
 import sys
 
-from bs4 import BeautifulSoup
-from urllib.request import Request, urlopen
+#pylint: disable=import-error
+from utils import get_page_soup
+#pylint: enable=import-error
 from collections import OrderedDict, namedtuple
+
 
 class Manga:
     def __init__(self, title, chapters):
         self.title = title
         self.chapters = chapters
 
-    def chapters(self):
-        print("chapters")
 
 class Chapter:
     def __init__(self, first_page_url, number):
@@ -18,9 +18,11 @@ class Chapter:
         self.number = number
 
     def pages(self):
-        return Page("test name", "test url")  
+        return Page("test name", "test url")
+
 
 Page = namedtuple("Page", "name url")
+
 
 class MangaRepository:
     base_url = None
@@ -28,28 +30,12 @@ class MangaRepository:
     def search(self, manga):
         print(manga)
 
-
-def get_page_soup(url):
-    """Download a page and return a BeautifulSoup object of the html"""
-
-    request = Request(url)
-    request.add_header('User-Agent', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_2) AppleWebKit/537.36 \
-                              (KHTML, like Gecko) Chrome/63.0.3239.108 Safari/537.36')
-    response = urlopen(request, timeout=5)
-
-    if response.info().get('Content-Encoding') == 'gzip':
-        gzipFile = gzip.GzipFile(fileobj=response)
-        page_content = gzipFile.read()
-    else:
-        page_content = response.read()
-
-    soup_page = BeautifulSoup(page_content, "html.parser")
-
-    return soup_page
-
-
 # https://github.com/techwizrd/MangaFox-Download-Script
 # https://github.com/jahmad/getmanga/blob/master/getmanga/__init__.py
+
+# brew postinstall python
+# TODO:  WARNING: The script pycodestyle is installed in '/Users/alessandro/Library/Python/3.7/bin' which is not on PATH.
+
 
 class MangaFox(MangaRepository):
     name = "MangaFox"
@@ -66,19 +52,17 @@ class MangaFox(MangaRepository):
         _chapters = []
 
         for url in chapters_url:
-            number = url.split("/")[-2][1:] #relative url  
+            number = url.split("/")[-2][1:]  # relative url
             chapter = Chapter(url, number)
-            print(chapter.number) #relative url  
-            _chapters.append(chapter)  
-
+            print(chapter.number)  # relative url
+            _chapters.append(chapter)
 
         manga = Manga(
             manga_name,
             _chapters
         )
 
-
-        print(len(manga.chapters))    
+        print(len(manga.chapters))
 
         # TODO: manga with multi word titles
         # TODO: @property and static methods
@@ -98,7 +82,6 @@ class MangaFox(MangaRepository):
         warning = soup.find('div', {'class': 'warning'})
         if warning and 'licensed' in warning.text:
             sys.exit('Error: ' + warning.text)
-
 
         chapters = OrderedDict()
         links = soup.findAll('a', {'class': 'tips'})
@@ -120,11 +103,6 @@ class MangaFox(MangaRepository):
         
         #print(manga, self._base_url)
         # value stored in a variable 
-
-
-
-
-
 
 repository = MangaFox()
 repository.search("naruto")
