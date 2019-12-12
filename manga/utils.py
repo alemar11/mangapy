@@ -1,4 +1,3 @@
-import gzip
 import urllib.request
 
 from bs4 import BeautifulSoup
@@ -10,12 +9,13 @@ def get_page_soup(url):
     request = urllib.request.Request(url)
     request.add_header('User-Agent', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_2) AppleWebKit/537.36 \
                               (KHTML, like Gecko) Chrome/63.0.3239.108 Safari/537.36')
+
+    request.add_header('Cookie', 'isAdult=1')
     response = urllib.request.urlopen(request, timeout=5)
 
     # https://free-proxy-list.net
-    request.set_proxy('91.203.27.139', 'https')
-    had_proxy = request.has_proxy()
-    print(had_proxy)
+    #request.set_proxy('91.203.27.139', 'https')
+    #had_proxy = request.has_proxy()
 
     if response.info().get('Content-Encoding') == 'gzip':
         gzipFile = GzipFile(fileobj=response)
@@ -24,8 +24,4 @@ def get_page_soup(url):
         page_content = response.read()
 
     soup = BeautifulSoup(page_content, "html.parser")
-
     return soup
-
-
-#get_page_soup("http://fanfox.net/manga/naruto/")
