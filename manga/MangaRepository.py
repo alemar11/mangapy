@@ -1,8 +1,6 @@
 import sys
 
-#pylint: disable=import-error
 from utils import get_page_soup
-#pylint: enable=import-error
 from collections import OrderedDict, namedtuple
 
 
@@ -40,6 +38,9 @@ class MangaRepository:
 class MangaFox(MangaRepository):
     name = "MangaFox"
     base_url = "http://fanfox.net"
+
+    def suggest(self, manga_name):
+        print("suggest")
 
     def search(self, manga_name):
         manga_url = "{0}/manga/{1}/".format(self.base_url, manga_name)

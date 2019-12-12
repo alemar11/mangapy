@@ -1,9 +1,11 @@
 {
     "python.pythonPath": "/usr/local/bin/python3",
     "python.linting.enabled": true,
-    //"python.linting.pylintPath": "/Users/alessandro/Library/Python/3.7/bin//pylint",
+    //"python.linting.pylintPath": "~/Library/Python/3.7/bin/pylint",
     "python.linting.pylintEnabled": true,
-    "python.linting.flake8Enabled": false
+    //"python.linting.flake8Enabled": false
 }
 
 // export PATH=$PATH:$HOME/Library/Python/3.7/bin/
+
+// /Users/amarzoli/.rbenv/shims:/Users/amarzoli/.rbenv/bin:/Users/amarzoli/Developer/dotfiles/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Users/amarzoli/.rbenv/shims:/Users/amarzoli/.rbenv/bin:/Users/amarzoli/Developer/dotfiles/bin

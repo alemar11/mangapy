@@ -1,12 +1,6 @@
 from bs4 import BeautifulSoup
 from urllib.request import Request, urlopen
 
-
-class Test(object):
-    def xxx(self):
-        print("--")
-
-
 def get_page_soup(url):
     """Download a page and return a BeautifulSoup object of the html"""
 
