@@ -1,4 +1,5 @@
 import sys
+import scrapy
 
 from utils import get_page_soup
 from collections import OrderedDict, namedtuple
