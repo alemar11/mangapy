@@ -1,5 +1,6 @@
 import re
 import os
+import time
 import gzip
 
 from utils import get_page_soup
@@ -124,12 +125,6 @@ class MangaFoxChapter(Chapter):
         # http://fanfox.net/manga/naruto/v72/c000/1.html
         # http://fanfox.net/manga/naruto/v72/c700.6/chapterfun.ashx?cid=370505&page=1&key=
 
-        # chapter id 37505
-
-        _request = urllib.request.Request(self.first_page_url)
-        _request.add_header('User-Agent', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_2) AppleWebKit/537.36 \
-                              (KHTML, like Gecko) Chrome/63.0.3239.108 Safari/537.36')
-        _r = urllib.request.urlopen(_request)
 
         url = self.first_page_url[:self.first_page_url.rfind('/')]
         url += '/chapterfun.ashx?cid={0}&page={1}&key='.format(metadata.chapter_id, 1)
@@ -141,25 +136,43 @@ class MangaFoxChapter(Chapter):
         request.add_header('User-Agent', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_2) AppleWebKit/537.36 \
                               (KHTML, like Gecko) Chrome/63.0.3239.108 Safari/537.36')
 
+        '''
+        request.add_header('Cookie', 'DM5_MACHINEKEY=c83e0271-3c3b-40cc-9216-5a2e7932f8bc; \
+            UM_distinctid=16f001b14021066-02908a256107e38-481c3301-384000-16f001b1403fcc; \
+            __cfduid=dc34e68f40119c6ad4d514105a1d37dc01576254771; \
+            SERVERID=node2; \
+            imageload=370505%7C46'
+            )
+        '''
 
-        #curl "http://fanfox.net/manga/naruto/v72/c700.6/chapterfun.ashx?cid=370505&page=3&key=5a79d5696ec4d773" -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:63.0) Gecko/20100101 Firefox/63.0"                      
+        encrypted = None
+        max_attempts = 100
+        i = 1
+        while encrypted is None:
+            print(i)
+            if i != 1:
+                time.sleep(2.4)
+            i += 1
+            response = urllib.request.urlopen(request, timeout=5)
+            content = response.read()
+            if content is None:
+                continue
 
-        #request.add_header('Cookie', '__cfduid=d0f0db9991e529488e861d4d2b86a96aa1576244331; DM5_MACHINEKEY=4ba3098c-972a-49ff-a4ed-28cb0fa01ffc; SERVERID=node1; UM_distinctid=16eff7bc346105-0963b5e11a3526-12326b5a-384000-16eff7bc347f09; CNZZDATA1278094021=131635546-1576242533-%7C1576242533; CNZZDATA1278094028=1526391161-1576242090-%7C1576242090; __utma=1.1523059990.1576244331.1576244331.1576244331.1; __utmc=1; __utmz=1.1576244331.1.1.utmcsr=(direct)|utmccn=(direct)|utmcmd=(none); image_time_cookie=370505|637118699314357798|0; dm5imgpage=370505|1:0; readhistoryitem=History=8,637118699314514387,370505,1,0,0,0,750&ViewType=0; readhistory_time=8-370505-1; imageload=370505%7C2; __utmb=1.2.10.1576244331')
-        #request.add_header('Cookie', '__cfduid=d0f0db9991e529488e861d4d2b86a96aa1576244331; DM5_MACHINEKEY=4ba3098c-972a-49ff-a4ed-28cb0fa01ffc; SERVERID=node1; UM_distinctid=16eff7bc346105-0963b5e11a3526-12326b5a-384000-16eff7bc347f09; CNZZDATA1278094021=131635546-1576242533-%7C1576242533; CNZZDATA1278094028=1526391161-1576242090-%7C1576242090; __utma=1.1523059990.1576244331.1576244331.1576244331.1; __utmc=1; __utmz=1.1576244331.1.1.utmcsr=(direct)|utmccn=(direct)|utmcmd=(none); dm5imgpage=370505|1:0; readhistory_time=8-370505-1; imageload=370505%7C2; __utmb=1.3.10.1576244331; image_time_cookie=370505|637118729348173275|4; readhistoryitem=History=8,637118706252704366,370505,1,0,0,0,750&ViewType=0')
-        request.add_header('Cookie', 'image_time_cookie=370505|637118729348173275|4;')
-        response = urllib.request.urlopen(request, timeout=5)
-        content = response.read()
+            body = content
+            body = body.decode().rstrip("\n\r")
 
-        body = content
-        body = body.decode().rstrip("\n\r")
+            if body == '':
+                continue
 
-        encrypted = body.split('}(')[1][:-1]
-        print(eval('unpack(' + encrypted))
+            encrypted = body.split('}(')[1][:-1]
+            unpacked = eval('unpack(' + encrypted) # https://www.strictly-software.com/unpack-javascript
+
+        print('found')
 
         pages = []
         for i in range(first_page_number, last_page_number): # TODO this not consider the last page
             page_url = re.sub(r'(?<=\/)[0-9]+(?=.html)', str(i), self.first_page_url)
-            print(page_url)
+            #print(page_url)
             page = Page("name", page_url)
             pages.append(page)
 
