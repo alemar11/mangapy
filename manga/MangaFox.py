@@ -1,12 +1,12 @@
 import re
-import os
 import time
-import gzip
 
 from utils import get_page_soup
 from MangaRepository import MangaRepository, Manga, Chapter, Page
 from collections import namedtuple
 import urllib.request
+from bs4 import BeautifulSoup
+
 
 def baseN(num, b, numerals="0123456789abcdefghijklmnopqrstuvwxyz"):
     return ((num == 0) and numerals[0]) or (baseN(num // b, b, numerals).lstrip(numerals[0]) + numerals[num % b])
@@ -21,7 +21,7 @@ def unpack(p, a, c, k, e=None, d=None):
 
 class MangaFox(MangaRepository):
     name = "MangaFox"
-    base_url = "http://fanfox.net"
+    base_url = "https://fanfox.net"
 
     def suggest(self, manga_name):
         manga_name_adjusted = re.sub(r'[^A-Za-z0-9]+', '+', re.sub(r'^[^A-Za-z0-9]+|[^A-Za-z0-9]+$', '', manga_name))
@@ -71,7 +71,7 @@ class MangaFox(MangaRepository):
         return manga
 
 
-ChapterMetadata = namedtuple("ChapterMetadata", "comic_id chapter_id image_count")
+ChapterMetadata = namedtuple("ChapterMetadata", "comic_id chapter_id image_count, key, cookies")
 
 class MangaFoxChapter(Chapter):
     def hello(self):
@@ -79,11 +79,24 @@ class MangaFoxChapter(Chapter):
 
     def metadata(self, page):
         test_url = 'http://fanfox.net/manga/naruto/v01/c000/13.html'
-        soup = get_page_soup(test_url)
+
+        request = urllib.request.Request(test_url)
+        request.add_header('User-Agent', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_2) AppleWebKit/537.36 \
+                              (KHTML, like Gecko) Chrome/63.0.3239.108 Safari/537.36')
+
+        request.add_header('Cookie', 'isAdult=1')
+        response = urllib.request.urlopen(request, timeout=5)
+        cookies = response.getheader('Set-Cookie')
+
+
+        page_content = response.read()
+        soup = BeautifulSoup(page_content, "html.parser")
+        #soup = get_page_soup(test_url)
 
         comic_id = None
         chapter_id = None
         image_count = None
+        key = None
 
         for script in soup.find_all("script", {"src": False}):
             comic_id_match = re.search(r'(var comicid\s*=\s*)([0-9]+)(?=;)', script.string)
@@ -98,25 +111,38 @@ class MangaFoxChapter(Chapter):
             if image_count_match:
                 image_count = image_count_match.group(2)
 
-        if comic_id is None or chapter_id is None or image_count is None:
+            if script.string.startswith(' eval(function(p,a,c,k,e,d)'):
+                text = script.string.rstrip("\n\r")
+
+                if text == '':
+                    continue
+
+                encrypted = text.split('}(')[1][:-1]
+                unpacked = eval('unpack(' + encrypted) # https://www.strictly-software.com/unpack-javascript
+                key_match = re.search(r'(?<=var guidkey=)(.*)(?=\';)', unpacked)
+                _key = key_match.group(1)
+                _key = _key.replace('\'', '')
+                _key = _key.replace('\\', '')
+                _key = _key.replace('+', '')
+                key = _key
+
+
+        if comic_id is None or chapter_id is None or image_count is None or key is None:
             return None
 
-        return ChapterMetadata(comic_id, chapter_id, int(image_count))
+        return ChapterMetadata(comic_id, chapter_id, int(image_count), key, cookies)
                     
 
 
     def pages(self):
-        #http://fanfox.net/manga/naruto/v72/c700.6/10.html
-        #http://fanfox.net/manga/naruto/v01/c000/3.html
-
-        #first_chapter_url = "{0}{1}/".format(self.base_url, self.first_page_url)
-        #img class="reader-main-img" src
+        '''
         soup = get_page_soup(self.first_page_url)
         page_numbers = soup.findAll("a", {"data-page": True})
 
         page_numbers = map(lambda x: int(x['data-page']), page_numbers)
         first_page_number = 1
         last_page_number = max(page_numbers)
+        '''
 
         metadata = self.metadata(self.first_page_url)
 
@@ -125,25 +151,15 @@ class MangaFoxChapter(Chapter):
         # http://fanfox.net/manga/naruto/v72/c000/1.html
         # http://fanfox.net/manga/naruto/v72/c700.6/chapterfun.ashx?cid=370505&page=1&key=
 
-
         url = self.first_page_url[:self.first_page_url.rfind('/')]
-        url += '/chapterfun.ashx?cid={0}&page={1}&key='.format(metadata.chapter_id, 1)
-        
+        url += '/chapterfun.ashx?cid={0}&page={1}&key={2}'.format(metadata.chapter_id, 1, metadata.key)        
 
-        url = 'http://fanfox.net/manga/naruto/v72/c700.6/chapterfun.ashx?cid=370505&page=1&key='
-
+        #url = 'http://fanfox.net/manga/naruto/v72/c700.6/chapterfun.ashx?cid=370505&page=1&key={0}'.format(metadata.key)
+        #url = 'http://fanfox.net/manga/naruto/v72/c700.6/history.ashx?cid=370505&mid=8&page=1&uid=0'
         request = urllib.request.Request(url)
         request.add_header('User-Agent', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_2) AppleWebKit/537.36 \
                               (KHTML, like Gecko) Chrome/63.0.3239.108 Safari/537.36')
-
-        '''
-        request.add_header('Cookie', 'DM5_MACHINEKEY=c83e0271-3c3b-40cc-9216-5a2e7932f8bc; \
-            UM_distinctid=16f001b14021066-02908a256107e38-481c3301-384000-16f001b1403fcc; \
-            __cfduid=dc34e68f40119c6ad4d514105a1d37dc01576254771; \
-            SERVERID=node2; \
-            imageload=370505%7C46'
-            )
-        '''
+        request.add_header('Cookie', metadata.cookies)                              
 
         encrypted = None
         max_attempts = 100
@@ -178,7 +194,6 @@ class MangaFoxChapter(Chapter):
 
 
 repository = MangaFox()
-
 manga = repository.search("naruto")
 firstChapter = manga.chapters[0]
 firstChapter.pages()
@@ -193,11 +208,3 @@ firstChapter.pages()
 #repository.suggest("kimetsu")
 #repository.search('Free! dj - Kekkon Shitara Dou Naru!?') # adult content
 #http://fanfox.net/manga/gentleman_devil/v01/c038/1.html # adult content
-
-
-
-
-#encrypted = r'''eval(function(p,a,c,k,e,d){e=function(c){return c};if(!''.replace(/^/,String)){while(c--)d[c]=k[c]||c;k=[function(e){return d[e]}];e=function(){return'\\w+'};c=1;};while(c--)if(k[c])p=p.replace(new RegExp('\\b'+e(c)+'\\b','g'),k[c]);return p;}('5 11=17;5 12=["/3/2/1/0/13.4","/3/2/1/0/15.4","/3/2/1/0/14.4","/3/2/1/0/7.4","/3/2/1/0/6.4","/3/2/1/0/8.4","/3/2/1/0/10.4","/3/2/1/0/9.4","/3/2/1/0/23.4","/3/2/1/0/22.4","/3/2/1/0/24.4","/3/2/1/0/26.4","/3/2/1/0/25.4","/3/2/1/0/18.4","/3/2/1/0/16.4","/3/2/1/0/19.4","/3/2/1/0/21.4"];5 20=0;',10,27,'40769|54|Images|Files|png|var|imanhua_005_140430179|imanhua_004_140430179|imanhua_006_140430226|imanhua_008_140430242|imanhua_007_140430226|len|pic|imanhua_001_140429664|imanhua_003_140430117|imanhua_002_140430070|imanhua_015_140430414||imanhua_014_140430382|imanhua_016_140430414|sid|imanhua_017_140430429|imanhua_010_140430289|imanhua_009_140430242|imanhua_011_140430367|imanhua_013_140430382|imanhua_012_140430367'.split('|'),0,{}))'''
-encrypted = r'''eval(function(p,a,c,k,e,d){e=function(c){return(c<a?"":e(parseInt(c/a)))+((c=c%a)>35?String.fromCharCode(c+29):c.toString(36))};if(!''.replace(/^/,String)){while(c--)d[e(c)]=k[c]||e(c);k=[function(e){return d[e]}];e=function(){return'\\w+'};c=1;};while(c--)if(k[c])p=p.replace(new RegExp('\\b'+e(c)+'\\b','g'),k[c]);return p;}('r c(){2 h="//s.7.a/e/3/6/4-5.0/b";2 1=["/k.f?g=n&8=9","/l.f?g=m&8=9"];j(2 i=0;i<1.t;i++){u(i==0){1[i]="//s.7.a/e/3/6/4-5.0/b"+1[i];o}1[i]=h+1[i]}p 1}2 d;d=c();q=0;',31,31,'|pvalue|var|manga|01|038|22117|fanfox|ttl|1576252800|net|compressed|dm5imagefun||store|jpg|token|pix||for|e20191002_111418_525|e20191002_111418_526|b4e0963e2a1f126841f25f6aba6d2891f97edf70|8d4f90035f871134e742e2ca4daa7a7438cad7ce|continue|return|currentimageid|function||length|if'.split('|'),0,{}))'''
-encrypted = encrypted.split('}(')[1][:-1]
-print(eval('unpack(' + encrypted))
