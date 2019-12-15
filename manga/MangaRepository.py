@@ -17,7 +17,7 @@ class Chapter:
         return Page("test name", "test url")
 
 
-Page = namedtuple("Page", "name url")
+Page = namedtuple("Page", "number url")
 
 
 class MangaRepository:
