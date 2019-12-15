@@ -18,7 +18,7 @@ class MangaPark(MangaRepository):
         # support alphanumeric names with multiple words
         manga_name_adjusted = re.sub(r'[^A-Za-z0-9]+', '-', re.sub(r'^[^A-Za-z0-9]+|[^A-Za-z0-9]+$', '', manga_name)).lower()
         manga_url = "{0}/manga/{1}".format(self.base_url, manga_name_adjusted)
-        response = requests.get(manga_url, verify=True, cookies=self.cookies)
+        response = requests.get(manga_url, verify=False, cookies=self.cookies)
 
         if response is None or response.status_code != 200:
             return None
@@ -71,27 +71,22 @@ class MangaPark(MangaRepository):
 
 class MangaParkChapter(Chapter):
     def pages(self):
-        response = requests.get(self.first_page_url)
-        pages = []
-
+        response = requests.get(self.first_page_url, verify=False)
         if response is None or response.status_code != 200:
             return None
 
         body = response.text
         soup = BeautifulSoup(body, "html.parser")
         scripts = soup.findAll('script')
-        for script in scripts:
-            if script.text.find('var _load_pages') > 0:
-                match = re.search(r'(var _load_pages\s*=\s*)(.+)(?=;)', script.text)
-                json_payload = match.group(2)
-                json_pages = json.loads(json_payload)
-                for page in json_pages:
-                    pages.append(Page(page['n'], page['u']))
+        generator = (script for script in scripts if script.text.find('var _load_pages') > 0)
 
-                print(match)
-            else:
-                continue   
-        return pages
+        for script in generator:
+            match = re.search(r'(var _load_pages\s*=\s*)(.+)(?=;)', script.text)
+            json_payload = match.group(2)
+            json_pages = json.loads(json_payload)
+            for page in json_pages:
+                yield Page(page['n'], page['u'])
+
 
 repository = MangaPark()
 #manga = repository.search("naruto")
@@ -100,5 +95,5 @@ if manga is not None:
     print(len(manga.chapters))
     firstChapter = manga.chapters[0]
     pages = firstChapter.pages()
-    print(len(pages))
-
+    for page in pages:
+        print(page.number)
