@@ -55,6 +55,7 @@ class MangaPark(MangaRepository):
         manga_chapters = []
         
         for url in chapters_url:
+            # TODO (bug): /manga/naruto-eroi-no-vol-1-doujinshi/i1737519 (in this case we don't have a number nor a /1)
             chapter_number = url.split("/")[-2][1:]
             chapter_relative_url = url.rsplit('/', 1)[0]
             chapter_url = "{0}{1}".format(self.base_url, chapter_relative_url)
@@ -90,7 +91,8 @@ class MangaParkChapter(Chapter):
 
 repository = MangaPark()
 #manga = repository.search("naruto")
-manga = repository.search('emergence') # adult content
+#manga = repository.search('emergence') # adult content
+manga = repository.search('Naruto - Eroi no Vol.1 (Doujinshi)')  # adult content
 if manga is not None:
     print(len(manga.chapters))
     firstChapter = manga.chapters[0]
