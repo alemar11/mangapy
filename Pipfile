@@ -7,10 +7,13 @@ verify_ssl = true
 flake8 = "*"
 pylint = "*"
 v = {editable = true,version = "*"}
+pytest = "*"
 
 [packages]
 bs4 = "*"
 requests = "*"
+pylint = "*"
+mangapy = {editable = true,path = "."}
 
 [requires]
 python_version = "3.7"

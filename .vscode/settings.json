@@ -1,9 +1,9 @@
 {
     //"python.pythonPath": "/usr/local/bin/python3",
-    "python.pythonPath": "/Users/amarzoli/.local/share/virtualenvs/manga_proj-WzlJKONs/bin/python",
+    "python.pythonPath": "/Users/amarzoli/.local/share/virtualenvs/manga-S-NqUtI-/bin/python",
     "python.linting.enabled": true,
     //"python.linting.pylintPath": "~/Library/Python/3.7/bin/pylint",
-    "python.linting.pylintEnabled": true,
+    "python.linting.pylintEnabled": false,
     "python.linting.flake8Enabled": false,
     "python.linting.flake8Args": [
         "--max-line-length=120",

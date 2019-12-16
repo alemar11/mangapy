@@ -2,7 +2,7 @@ import re
 import requests
 import json
 
-from mangapy.MangaRepository import MangaRepository, Manga, Chapter, Page
+from mangapy.mangarepository import MangaRepository, Manga, Chapter, Page
 from bs4 import BeautifulSoup
 
 
