@@ -1,14 +1,13 @@
 {
-    "python.pythonPath": "/usr/local/bin/python3",
+    //"python.pythonPath": "/usr/local/bin/python3",
+    "python.pythonPath": "/Users/amarzoli/.local/share/virtualenvs/manga_proj-WzlJKONs/bin/python",
     "python.linting.enabled": true,
     //"python.linting.pylintPath": "~/Library/Python/3.7/bin/pylint",
-    "python.linting.pylintEnabled": false,
-    "python.linting.flake8Enabled": true,
+    "python.linting.pylintEnabled": true,
+    "python.linting.flake8Enabled": false,
     "python.linting.flake8Args": [
         "--max-line-length=120",
     ],
 }
 
-// export PATH=$PATH:$HOME/Library/Python/3.7/bin/
-
-// /Users/amarzoli/.rbenv/shims:/Users/amarzoli/.rbenv/bin:/Users/amarzoli/Developer/dotfiles/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Users/amarzoli/.rbenv/shims:/Users/amarzoli/.rbenv/bin:/Users/amarzoli/Developer/dotfiles/bin
+// To configure pythonPath when using pipenv -> pipenv --py
