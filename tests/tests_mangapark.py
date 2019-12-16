@@ -32,9 +32,20 @@ class TestMangaPark(unittest.TestCase):
             self.assertIsNotNone(page.number)
             self.assertIsNotNone(page.url)
 
+    def test_parse_mangapark_adult_content_with_single_volume(self):
+        manga = self.repository.search('Naruto - Eroi no Vol.1 (Doujinshi)')
+        self.assertIsNotNone(manga)
+        self.assertEqual(len(manga.chapters), 1, "It should contain only 1 chapter")
+        firstChapter = manga.chapters[0]
+        self.assertIsNotNone(firstChapter)
+        pages = firstChapter.pages()
+        for page in pages:
+            self.assertIsNotNone(page.number)
+            self.assertIsNotNone(page.url)
+
 
 if __name__ == '__main__':
     unittest.main()
 
 
-#https://realpython.com/python-testing/
+# https://realpython.com/python-testing/

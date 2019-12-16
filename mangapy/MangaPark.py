@@ -19,7 +19,7 @@ class MangaParkRepository(MangaRepository):
         manga_name_adjusted = re.sub(r'[^A-Za-z0-9]+', '-', re.sub(r'^[^A-Za-z0-9]+|[^A-Za-z0-9]+$', '', manga_name)).lower()
         manga_url = "{0}/manga/{1}".format(self.base_url, manga_name_adjusted)
         response = requests.get(manga_url, verify=False, cookies=self.cookies)
-
+        
         if response is None or response.status_code != 200:
             return None
 
@@ -101,8 +101,6 @@ class MangaParkChapter(Chapter):
 if __name__ == "__main__":
     repository = MangaParkRepository()
     manga = repository.search("naruto")
-    #manga = repository.search('emergence') # adult content
-    #manga = repository.search('Naruto - Eroi no Vol.1 (Doujinshi)')  # adult content
     if manga is not None:
         print(len(manga.chapters))
         firstChapter = manga.chapters[0]

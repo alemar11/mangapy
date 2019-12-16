@@ -1,4 +1,4 @@
-"""Setup for the manga package."""
+"""Setup for the mangapy package."""
 
 from setuptools import setup, find_packages
 
