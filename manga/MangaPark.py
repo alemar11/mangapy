@@ -14,7 +14,7 @@ class MangaPark(MangaRepository):
     def suggest(self, manga_name):
         return None
         
-    def search(self, manga_name):    
+    def search(self, manga_name):
         # support alphanumeric names with multiple words
         manga_name_adjusted = re.sub(r'[^A-Za-z0-9]+', '-', re.sub(r'^[^A-Za-z0-9]+|[^A-Za-z0-9]+$', '', manga_name)).lower()
         manga_url = "{0}/manga/{1}".format(self.base_url, manga_name_adjusted)
@@ -56,8 +56,17 @@ class MangaPark(MangaRepository):
         
         for url in chapters_url:
             # TODO (bug): /manga/naruto-eroi-no-vol-1-doujinshi/i1737519 (in this case we don't have a number nor a /1)
-            chapter_number = url.split("/")[-2][1:]
-            chapter_relative_url = url.rsplit('/', 1)[0]
+            splits = chapter_relative_url = url.rsplit('/', 1)
+            chapter_number = 0
+            last_path = splits[-1]
+            chapter_relative_url = url
+            try:
+                _ = int(last_path)  # if it's an int, we can get the chapter number
+                chapter_number = splits[-2][1:]
+                chapter_relative_url = url.rsplit('/', 1)[0]
+            except ValueError:
+                pass  # it was a string, not an int.
+
             chapter_url = "{0}{1}".format(self.base_url, chapter_relative_url)
             chapter = MangaParkChapter(chapter_url, chapter_number)
             manga_chapters.append(chapter)
@@ -90,9 +99,9 @@ class MangaParkChapter(Chapter):
 
 
 repository = MangaPark()
-#manga = repository.search("naruto")
+manga = repository.search("naruto")
 #manga = repository.search('emergence') # adult content
-manga = repository.search('Naruto - Eroi no Vol.1 (Doujinshi)')  # adult content
+#manga = repository.search('Naruto - Eroi no Vol.1 (Doujinshi)')  # adult content
 if manga is not None:
     print(len(manga.chapters))
     firstChapter = manga.chapters[0]
