@@ -10,4 +10,9 @@
     ],
 }
 
-// To configure pythonPath when using pipenv -> pipenv --py
+// To configure pythonPath when using pipenv
+// pipenv --py
+//
+// or
+//
+// pipenv --venv
