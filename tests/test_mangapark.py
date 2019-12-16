@@ -43,7 +43,3 @@ def test_parse_mangapark_adult_content_with_single_volume():
     for page in pages:
         assert page.number is not None
         assert page.url is not None
-
-
-# https://realpython.com/python-testing/
-# pipenv run python -m unittest
