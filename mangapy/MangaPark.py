@@ -2,7 +2,7 @@ import re
 import requests
 import json
 
-from mangapy.mangarepository import MangaRepository, Manga, Chapter, Page
+from mangapy.mangarepository import MangaRepository, Manga, Chapter, Page, download
 from bs4 import BeautifulSoup
 
 
@@ -60,8 +60,8 @@ class MangaParkRepository(MangaRepository):
             last_path = splits[-1]
             chapter_relative_url = url
             try:
-                _ = int(last_path)  # if it's an int, we can get the chapter number
-                chapter_number = splits[-2][1:]
+                chapter_number = int(last_path[1:])  # if it's an int, we can get the chapter number
+                #chapter_number = splits[-2][1:]
                 chapter_relative_url = url.rsplit('/', 1)[0]
             except ValueError:
                 pass  # it was a string, not an int.
@@ -99,16 +99,25 @@ class MangaParkChapter(Chapter):
 
 if __name__ == "__main__":
     import asyncio
-
+    
     repository = MangaParkRepository()
     manga = repository.search("naruto")
+
     if manga is not None:
         print(len(manga.chapters))
         firstChapter = manga.chapters[0]
-        asyncio.run(firstChapter.download(path='~/Downloads/ale_test2'))
-        '''
-        pages = firstChapter.pages()
-        for page in pages:
-            print(page.url)
-            print(page.number)
-        '''
+        secondChapter = manga.chapters[1]
+        thirdChapter = manga.chapters[2]
+        #asyncio.run(firstChapter.download(path='~/Downloads/mangapy'))
+        #asyncio.run(download(firstChapter, '~/Downloads/mangapy'))
+
+        path = '~/Downloads/mangapy'
+
+        loop = asyncio.get_event_loop()
+        tasks = [
+            download(firstChapter, path),
+            download(secondChapter, path),
+            download(thirdChapter, path)]
+        loop.run_until_complete(asyncio.wait(tasks))
+        loop.close()
+

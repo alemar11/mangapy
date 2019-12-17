@@ -1,8 +1,9 @@
 
 from collections import namedtuple
-import downloader
+from mangapy import downloader
 import asyncio
 import aiohttp
+import os
 
 
 class Manga:
@@ -24,15 +25,32 @@ class Chapter:
         raise Exception('pages should be implemented in a subclass')
 
     async def download(self, path):
+        await download(self, path)
+        '''
         async with aiohttp.ClientSession() as session:
             tasks = []
-            for page in self.pages():
+            _pages = self.pages()
+            for page in _pages:
                 url = page.url
                 tasks.append(downloader.save(session, url, path, str(page.number)))
             contents = await asyncio.gather(*tasks)
             for content in contents:
                 print(content)
+        '''        
 
+
+async def download(chapter: Chapter, to: str):
+    async with aiohttp.ClientSession() as session:
+        to = os.path.join(to, str(chapter.number))
+        tasks = []
+        _pages = chapter.pages()
+        for page in _pages:
+            url = page.url
+            tasks.append(downloader.save(session, url, to, str(page.number)))
+        contents = await asyncio.gather(*tasks)
+        
+        for content in contents:
+            print(content)   
 
 
 Page = namedtuple("Page", "number url")
