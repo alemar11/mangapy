@@ -1,7 +1,5 @@
 import os
-import asyncio
-import aiohttp
-import hashlib
+
 
 
 class MangaException(Exception):
@@ -28,7 +26,7 @@ async def save(session, url, path, file_name):
     os.makedirs(dir, exist_ok=True)
     if not os.path.isdir(path):
         try:
-            os.makedirs(path, exist_ok=True)
+            os.makedirs(dir, exist_ok=True)
         except OSError as msg:
             raise MangaException(msg)
 
