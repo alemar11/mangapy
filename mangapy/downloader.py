@@ -1,7 +1,6 @@
 import os
 
 
-
 class MangaException(Exception):
     """Exception class for manga"""
     pass
