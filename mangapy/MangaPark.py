@@ -55,7 +55,6 @@ class MangaParkRepository(MangaRepository):
         manga_chapters = []
         
         for url in chapters_url:
-            # TODO (bug): /manga/naruto-eroi-no-vol-1-doujinshi/i1737519 (in this case we don't have a number nor a /1)
             splits = chapter_relative_url = url.rsplit('/', 1)
             chapter_number = 0
             last_path = splits[-1]
@@ -104,6 +103,8 @@ if __name__ == "__main__":
     if manga is not None:
         print(len(manga.chapters))
         firstChapter = manga.chapters[0]
+        firstChapter.download('~/Downloads/ale_test2')
         pages = firstChapter.pages()
         for page in pages:
-            print(page.number)
+            print(page.url)
+            ##print(page.number)
