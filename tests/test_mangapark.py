@@ -12,13 +12,16 @@ def test_parse_manga():
     repository = MangaParkRepository()
     manga = repository.search('naruto')
     assert manga is not None
-    assert len(manga.chapters) == 1021, "It should contain 1021gg chapters"
+    assert len(manga.chapters) == 1021, "It should contain 1021 chapters"
     firstChapter = manga.chapters[0]
     assert firstChapter is not None
     pages = firstChapter.pages()
+    count = 0
     for page in pages:
+        count += 1
         assert page.number is not None
         assert page.url is not None
+    assert count == 46, "The first Naruto chapter sould contain 46 pages"    
 
 def test_parse_mangapark_adult_content():
     repository = MangaParkRepository()
