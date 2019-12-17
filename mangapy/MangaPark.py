@@ -98,13 +98,17 @@ class MangaParkChapter(Chapter):
 
 
 if __name__ == "__main__":
+    import asyncio
+
     repository = MangaParkRepository()
     manga = repository.search("naruto")
     if manga is not None:
         print(len(manga.chapters))
         firstChapter = manga.chapters[0]
-        firstChapter.download('~/Downloads/ale_test2')
+        asyncio.run(firstChapter.download(path='~/Downloads/ale_test2'))
+        '''
         pages = firstChapter.pages()
         for page in pages:
             print(page.url)
-            ##print(page.number)
+            print(page.number)
+        '''

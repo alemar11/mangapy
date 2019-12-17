@@ -1,9 +1,5 @@
 import os
-import re
-import requests
-import sys
 import asyncio
-
 import aiohttp
 import hashlib
 
@@ -23,6 +19,7 @@ async def fetch(session, url):
     except OSError as msg:
         print(msg)
 
+
 async def save(session, url, path, file_name):
     data = await fetch(session, url)
     if data is None:
@@ -36,7 +33,7 @@ async def save(session, url, path, file_name):
             raise MangaException(msg)
 
     file = os.path.join(dir, file_name)
-    output = open(file,"wb")
+    output = open(file, "wb")
     output.write(data)
     output.close()
     return True     

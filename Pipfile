@@ -16,6 +16,7 @@ pylint = "*"
 mangapy = {editable = true,path = "."}
 asyncio = "*"
 aiohttp = "*"
+flake8 = "*"
 
 [requires]
 python_version = "3.7"

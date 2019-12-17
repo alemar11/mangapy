@@ -3,7 +3,7 @@ from collections import namedtuple
 import downloader
 import asyncio
 import aiohttp
-import hashlib
+
 
 class Manga:
     def __init__(self, title, chapters):
@@ -12,7 +12,7 @@ class Manga:
 
     @property
     def latest(self):
-        return self.manga.chapters[-1]    
+        return self.manga.chapters[-1]
 
 
 class Chapter:
@@ -23,21 +23,15 @@ class Chapter:
     def pages(self):
         raise Exception('pages should be implemented in a subclass')
 
-    def download(self, path):
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(self.fetch(path))
-
-    async def fetch(self, path):
-        tasks = []
+    async def download(self, path):
         async with aiohttp.ClientSession() as session:
+            tasks = []
             for page in self.pages():
                 url = page.url
-                hash_object = hashlib.md5(url.encode())
-                digest = hash_object.hexdigest()
                 tasks.append(downloader.save(session, url, path, str(page.number)))
             contents = await asyncio.gather(*tasks)
             for content in contents:
-                print(content)    
+                print(content)
 
 
 
