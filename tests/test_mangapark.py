@@ -6,7 +6,7 @@ from mangapy.mangapark import MangaParkRepository
 def test_parse_not_existing_manga():
     repository = MangaParkRepository()
     manga = repository.search('this manga doesn\'t exists')
-    self.assertIsNone(manga)
+    assert manga is None
 
 def test_parse_manga():
     repository = MangaParkRepository()
@@ -17,8 +17,8 @@ def test_parse_manga():
     assert firstChapter is not None
     pages = firstChapter.pages()
     for page in pages:
-        self.assertIsNotNone(page.number)
-        self.assertIsNotNone(page.url)
+        assert page.number is not None
+        assert page.url is not None
 
 def test_parse_mangapark_adult_content():
     repository = MangaParkRepository()
@@ -29,8 +29,8 @@ def test_parse_mangapark_adult_content():
     assert firstChapter
     pages = firstChapter.pages()
     for page in pages:
-        self.assertIsNotNone(page.number)
-        self.assertIsNotNone(page.url)
+        assert page.number is not None
+        assert page.url is not None
 
 def test_parse_mangapark_adult_content_with_single_volume():
     repository = MangaParkRepository()
