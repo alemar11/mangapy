@@ -20,9 +20,8 @@ async def fetch(session, url):
 async def save(session, url, path, file_name):
     data = await fetch(session, url)
     if data is None:
-        return False
+        return
     dir = os.path.expanduser(path)
-    os.makedirs(dir, exist_ok=True)
     if not os.path.isdir(path):
         try:
             os.makedirs(dir, exist_ok=True)
@@ -33,4 +32,3 @@ async def save(session, url, path, file_name):
     output = open(file, "wb")
     output.write(data)
     output.close()
-    return True

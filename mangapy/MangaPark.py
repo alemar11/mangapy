@@ -118,6 +118,8 @@ if __name__ == "__main__":
             download(firstChapter, path),
             download(secondChapter, path),
             download(thirdChapter, path)]
+
+        #https://www.educative.io/blog/python-concurrency-making-sense-of-asyncio    
         loop.run_until_complete(asyncio.wait(tasks))
         loop.close()
 
