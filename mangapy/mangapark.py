@@ -69,7 +69,7 @@ class MangaParkRepository(MangaRepository):
                     chapter_relative_url = url
                     try:
                         prefix = last_path[0]
-                        if prefix == 'c':
+                        if prefix.lower() == 'c':
                             chapter_number = float(last_path[1:])  # if it's a float, we can get the chapter number
                             chapter_relative_url = splits[0]
                         else: # one volume
