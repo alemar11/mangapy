@@ -1,6 +1,6 @@
-import re
-import json
 import aiohttp
+import json
+import re
 
 from mangapy.mangarepository import MangaRepository, Manga, Chapter, Page, download
 from bs4 import BeautifulSoup
@@ -22,6 +22,7 @@ class MangaParkRepository(MangaRepository):
         async with aiohttp.ClientSession() as session:
             async with session.get(url=manga_url, cookies=self.cookies) as response:
                 if response is None or response.status != 200:
+
                     return None
 
                 body = await response.content.read()
@@ -32,6 +33,13 @@ class MangaParkRepository(MangaRepository):
                 # 6 rock
                 # 4 duck
                 # 101 mini
+
+                '''
+                TODO: possible optimization
+                fetch the last chapter for every streams and determine the stream that has
+                the bigger chapter (decimal excluded) and most recently updated
+                '''
+
                 streams = ['stream_1', 'stream_3', 'stream_6', 'stream_4', 'stream_101']
                 content = None
                 for stream in streams:
@@ -57,15 +65,19 @@ class MangaParkRepository(MangaRepository):
                 
                 for url in chapters_url:
                     splits = chapter_relative_url = url.rsplit('/', 1)
-                    chapter_number = 0
                     last_path = splits[-1]
                     chapter_relative_url = url
                     try:
-                        chapter_number = int(last_path[1:])  # if it's an int, we can get the chapter number
-                        #chapter_number = splits[-2][1:]
-                        chapter_relative_url = url.rsplit('/', 1)[0]
+                        prefix = last_path[0]
+                        if prefix == 'c':
+                            chapter_number = float(last_path[1:])  # if it's a float, we can get the chapter number
+                            chapter_relative_url = splits[0]
+                        else: # one volume
+                            chapter_number = float(0)    
+                            chapter_relative_url = url
                     except ValueError:
-                        pass  # it was a string, not an int.
+                        chapter_number = 0
+                        pass  # it was a string, not a float.
 
                     chapter_url = "{0}{1}".format(self.base_url, chapter_relative_url)
                     chapter = MangaParkChapter(chapter_url, chapter_number)
@@ -96,10 +108,15 @@ class MangaParkChapter(Chapter):
                     json_payload = match.group(2)
                     json_pages = json.loads(json_payload)
                     for page in json_pages:
-                        pages.append(Page(page['n'], page['u']))
+                        url = page['u']
+                        if url.startswith('//'):
+                            url = 'https:' + page['u']
+                        pages.append(Page(page['n'], url))
                 return pages
 
 
+
+'''
 if __name__ == "__main__":
     import asyncio
     loop = asyncio.get_event_loop()
@@ -114,17 +131,20 @@ if __name__ == "__main__":
         firstChapter = manga.chapters[0]
         secondChapter = manga.chapters[1]
         thirdChapter = manga.chapters[2]
+        lastChapter = manga.chapters[-1]
         #asyncio.run(firstChapter.download(path='~/Downloads/mangapy'))
         #asyncio.run(download(firstChapter, '~/Downloads/mangapy'))
 
         path = '~/Downloads/mangapy'
 
         tasks = [
-            download(firstChapter, path),
-            download(secondChapter, path),
-            download(thirdChapter, path)]
+            download(lastChapter, path),
+            #download(firstChapter, path),
+            #download(secondChapter, path),
+            #download(thirdChapter, path)
+            ]
 
         #https://www.educative.io/blog/python-concurrency-making-sense-of-asyncio    
         loop.run_until_complete(asyncio.wait(tasks))
         loop.close()
-
+'''
