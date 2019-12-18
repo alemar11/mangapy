@@ -16,7 +16,7 @@ setup(
     url='https://github.com/alemar11/manga',
     packages=find_packages(),
     python_requires=">=3.5",
-    install_requires=['requests'],
+    install_requires=['aiohttp'],
     classifiers=[
         # (https://pypi.python.org/pypi?%3Aaction=list_classifiers)
         'Development Status :: 5 - Production/Stable',
