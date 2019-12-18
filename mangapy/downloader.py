@@ -1,5 +1,5 @@
 import os
-
+from urllib.parse import urlparse
 
 class MangaException(Exception):
     """Exception class for manga"""
@@ -18,6 +18,7 @@ async def fetch(session, url):
 
 
 async def save(session, url, path, file_name):
+    file_ext = urlparse(url).path.split('.')[-1]
     data = await fetch(session, url)
     if data is None:
         return
@@ -28,7 +29,7 @@ async def save(session, url, path, file_name):
         except OSError as msg:
             raise MangaException(msg)
 
-    file = os.path.join(dir, file_name)
+    file = os.path.join(dir, file_name + '.' + file_ext)
     output = open(file, "wb")
     output.write(data)
     output.close()
