@@ -11,6 +11,8 @@ class MangaParkRepository(MangaRepository):
     base_url = "https://mangapark.net"
     cookies = {'set': 'theme=1&h=1&img_load=5&img_zoom=1&img_tool=1&twin_m=0&twin_c=0&manga_a_warn=1&history=1&timezone=14'}
 
+    # TODO: @property and static methods
+
     def suggest(self, manga_name):
         return None
         
@@ -74,7 +76,6 @@ class MangaParkRepository(MangaRepository):
             manga_name,
             manga_chapters
         )
-        # TODO: @property and static methods
         return manga
 
 

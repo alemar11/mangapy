@@ -47,7 +47,7 @@ async def download(chapter: Chapter, to: str):
         for page in _pages:
             url = page.url
             tasks.append(downloader.save(session, url, to, str(page.number)))
-        await asyncio.gather(*tasks) 
+        await asyncio.gather(*tasks)
 
 
 Page = namedtuple("Page", "number url")
