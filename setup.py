@@ -28,6 +28,10 @@ setup(
         'Topic :: Software Development :: Libraries :: Python Modules',
         'Intended Audience :: End Users/Desktop',
     ],
+    entry_points="""
+    [console_scripts]
+    mangapy = mangapy.cli:main
+    """
 )
 
 # http://doc.pytest.org/en/latest/goodpractices.html
