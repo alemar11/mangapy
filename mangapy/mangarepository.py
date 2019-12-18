@@ -36,14 +36,14 @@ class Chapter:
             contents = await asyncio.gather(*tasks)
             for content in contents:
                 print(content)
-        '''        
+        '''
 
 
 async def download(chapter: Chapter, to: str):
     async with aiohttp.ClientSession() as session:
         to = os.path.join(to, str(chapter.number))
         tasks = []
-        _pages = chapter.pages()
+        _pages = await chapter.pages()
         for page in _pages:
             url = page.url
             tasks.append(downloader.save(session, url, to, str(page.number)))

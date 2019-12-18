@@ -1,6 +1,6 @@
 import re
-import requests
 import json
+import aiohttp
 
 from mangapy.mangarepository import MangaRepository, Manga, Chapter, Page, download
 from bs4 import BeautifulSoup
@@ -15,94 +15,99 @@ class MangaParkRepository(MangaRepository):
 
     def suggest(self, manga_name):
         return None
-        
-    def search(self, manga_name):
-        # support alphanumeric names with multiple words
+
+    async def search(self, manga_name):
         manga_name_adjusted = re.sub(r'[^A-Za-z0-9]+', '-', re.sub(r'^[^A-Za-z0-9]+|[^A-Za-z0-9]+$', '', manga_name)).lower()
         manga_url = "{0}/manga/{1}".format(self.base_url, manga_name_adjusted)
-        response = requests.get(manga_url, verify=False, cookies=self.cookies)
-        
-        if response is None or response.status_code != 200:
-            return None
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url=manga_url, cookies=self.cookies) as response:
+                if response is None or response.status != 200:
+                    return None
 
-        body = response.text
-        soup = BeautifulSoup(body, "html.parser")
-       
-        # 1 fox
-        # 3 panda
-        # 6 rock
-        # 4 duck
-        # 101 mini
-        streams = ['stream_1', 'stream_3', 'stream_6', 'stream_4', 'stream_101']
-        content = None
-        for stream in streams:
-            content = soup.find('div', {'id': stream})
-            if content is not None:
-                break
+                body = await response.content.read()
+                soup = BeautifulSoup(body, "html.parser")
+            
+                # 1 fox
+                # 3 panda
+                # 6 rock
+                # 4 duck
+                # 101 mini
+                streams = ['stream_1', 'stream_3', 'stream_6', 'stream_4', 'stream_101']
+                content = None
+                for stream in streams:
+                    content = soup.find('div', {'id': stream})
+                    if content is not None:
+                        break
 
-        if content is None:
-            '''
-            warning = soup.find('div', {'class': 'warning'})
-            if warning is not None:
-                print("Adult content")
-            '''    
-            return None
+                if content is None:
+                    '''
+                    warning = soup.find('div', {'class': 'warning'})
+                    if warning is not None:
+                        print("Adult content")
+                    '''    
+                    return None
 
-        chapters_detail = content.select('a.ml-1')
+                chapters_detail = content.select('a.ml-1')
 
-        if chapters_detail is None:
-            return None
+                if chapters_detail is None:
+                    return None
 
-        chapters_url = map(lambda c: c['href'], reversed(chapters_detail))
-        manga_chapters = []
-        
-        for url in chapters_url:
-            splits = chapter_relative_url = url.rsplit('/', 1)
-            chapter_number = 0
-            last_path = splits[-1]
-            chapter_relative_url = url
-            try:
-                chapter_number = int(last_path[1:])  # if it's an int, we can get the chapter number
-                #chapter_number = splits[-2][1:]
-                chapter_relative_url = url.rsplit('/', 1)[0]
-            except ValueError:
-                pass  # it was a string, not an int.
+                chapters_url = map(lambda c: c['href'], reversed(chapters_detail))
+                manga_chapters = []
+                
+                for url in chapters_url:
+                    splits = chapter_relative_url = url.rsplit('/', 1)
+                    chapter_number = 0
+                    last_path = splits[-1]
+                    chapter_relative_url = url
+                    try:
+                        chapter_number = int(last_path[1:])  # if it's an int, we can get the chapter number
+                        #chapter_number = splits[-2][1:]
+                        chapter_relative_url = url.rsplit('/', 1)[0]
+                    except ValueError:
+                        pass  # it was a string, not an int.
 
-            chapter_url = "{0}{1}".format(self.base_url, chapter_relative_url)
-            chapter = MangaParkChapter(chapter_url, chapter_number)
-            manga_chapters.append(chapter)
-        
-        manga = Manga(
-            manga_name,
-            manga_chapters
-        )
-        return manga
+                    chapter_url = "{0}{1}".format(self.base_url, chapter_relative_url)
+                    chapter = MangaParkChapter(chapter_url, chapter_number)
+                    manga_chapters.append(chapter)
+                
+                manga = Manga(
+                    manga_name,
+                    manga_chapters
+                )
+                return manga
 
 
 class MangaParkChapter(Chapter):
-    def pages(self):
-        response = requests.get(self.first_page_url, verify=False)
-        if response is None or response.status_code != 200:
-            return None
+    async def pages(self):
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url=self.first_page_url) as response:
+                pages = []
 
-        body = response.text
-        soup = BeautifulSoup(body, "html.parser")
-        scripts = soup.findAll('script')
-        generator = (script for script in scripts if script.text.find('var _load_pages') > 0)
-
-        for script in generator:
-            match = re.search(r'(var _load_pages\s*=\s*)(.+)(?=;)', script.text)
-            json_payload = match.group(2)
-            json_pages = json.loads(json_payload)
-            for page in json_pages:
-                yield Page(page['n'], page['u'])
+                if response is None or response.status != 200:
+                    return pages
+  
+                body = await response.content.read()
+                soup = BeautifulSoup(body, "html.parser")
+                scripts = soup.findAll('script')
+                generator = (script for script in scripts if script.text.find('var _load_pages') > 0)
+                for script in generator:
+                    match = re.search(r'(var _load_pages\s*=\s*)(.+)(?=;)', script.text)
+                    json_payload = match.group(2)
+                    json_pages = json.loads(json_payload)
+                    for page in json_pages:
+                        pages.append(Page(page['n'], page['u']))
+                return pages
 
 
 if __name__ == "__main__":
     import asyncio
-    
+    loop = asyncio.get_event_loop()
     repository = MangaParkRepository()
-    manga = repository.search("naruto")
+
+    manga = asyncio.run(repository.search("naruto"))
+
+    #manga = repository.search("naruto")
 
     if manga is not None:
         print(len(manga.chapters))
@@ -114,7 +119,6 @@ if __name__ == "__main__":
 
         path = '~/Downloads/mangapy'
 
-        loop = asyncio.get_event_loop()
         tasks = [
             download(firstChapter, path),
             download(secondChapter, path),
