@@ -1,5 +1,16 @@
 # mangapy
-manga
+
+Install from local folder
+
+```
+pip install .
+```
+
+Install from local folder (editable mode)
+
+```
+pip install -e .
+```
 
 
 TODO:
