@@ -10,36 +10,30 @@ def test_parse_not_existing_manga():
     assert manga is None
 
 
-def test_parse_manga_first_chapter():
+def test_parse_manga():
     repository = MangaParkRepository()
     manga = asyncio.run(repository.search('naruto'))
     assert manga is not None
-    assert len(manga.chapters) == 1021, "It should contain 1021 chapters"
+    assert len(manga.chapters) == 701, "It should contain 701 chapters"
     firstChapter = manga.chapters[0]
     assert firstChapter is not None
     pages = asyncio.run(firstChapter.pages())
-    count = 0
+    first_chapter_count = 0
     for page in pages:
-        count += 1
+        first_chapter_count += 1
         assert page.number is not None
         assert page.url is not None
-    assert count == 46, "The first Naruto chapter sould contain 46 pages"
+    assert first_chapter_count == 46, "The first Naruto chapter sould contain 46 pages"
 
-
-def test_parse_manga_last_chapter():
-    repository = MangaParkRepository()
-    manga = asyncio.run(repository.search('naruto'))
-    assert manga is not None
-    assert len(manga.chapters) == 1021, "It should contain 1021 chapters"
     lastChapter = manga.chapters[-1]
     assert lastChapter is not None
     pages = asyncio.run(lastChapter.pages())
-    count = 0
+    last_chapter_count = 0
     for page in pages:
-        count += 1
+        last_chapter_count += 1
         assert page.number is not None
         assert page.url is not None
-    assert count == 46, "The last Naruto chapter sould contain 18 pages"
+    assert last_chapter_count == 18, "The last Naruto chapter sould contain 18 pages"
 
 
 def test_parse_mangapark_adult_content():
