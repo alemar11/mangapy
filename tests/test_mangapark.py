@@ -41,11 +41,12 @@ def test_parse_manga_last_chapter():
         assert page.url is not None
     assert count == 46, "The last Naruto chapter sould contain 18 pages"    
 
+
 def test_parse_mangapark_adult_content():
     repository = MangaParkRepository()
     manga = asyncio.run(repository.search('emergence'))
     assert manga is not None
-    assert len(manga.chapters) == 8, "It should contain 8 chapters"
+    assert len(manga.chapters) == 7, "It should contain 7 chapters"
     firstChapter = manga.chapters[0]
     assert firstChapter
     pages = asyncio.run(firstChapter.pages())
