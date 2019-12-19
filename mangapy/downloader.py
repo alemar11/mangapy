@@ -1,4 +1,6 @@
+import glob
 import os
+from PIL import Image
 from urllib.parse import urlparse
 
 class MangaException(Exception):
@@ -33,3 +35,27 @@ async def save(session, url, path, file_name):
     output = open(file, "wb")
     output.write(data)
     output.close()
+
+
+def pdf(directory):
+    images_path = glob.glob('/Users/amarzoli/Downloads/mangapy/mangapark/naruto/1/*.jpg')
+    images = []
+    # ---> https://stackoverflow.com/questions/4836710/does-python-have-a-built-in-function-for-string-natural-sort
+
+    for path in images_path:
+        print(path)
+        images.append(Image.open(path))
+
+    pdf_filename = "/Users/amarzoli/Downloads/mangapy/mangapark/naruto/1/chapter.pdf"
+
+    #os.listdir('/Users/amarzoli/Downloads/mangapy/mangapark/naruto/1/')
+
+    #list = glob.glob('{0}/*.jpg'.format(directory))
+    # https://stackoverflow.com/questions/27327513/create-pdf-from-a-list-of-images
+    #im1 = Image.open("/Users/apple/Desktop/bbd.jpg")
+    #im2 = Image.open("/Users/apple/Desktop/bbd1.jpg")
+    #im3 = Image.open("/Users/apple/Desktop/bbd2.jpg")
+    #im_list = [im2, im3]
+    #pdf1_filename = "/Users/apple/Desktop/bbd1.pdf"
+    first_image = images.pop()
+    first_image.save(pdf_filename, "PDF", resolution=100.0, save_all=True, append_images=images)

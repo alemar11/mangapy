@@ -17,7 +17,7 @@ mangapy = {editable = true,path = "."}
 asyncio = "*"
 aiohttp = "*"
 flake8 = "*"
-urlparse = "*"
+pillow = "*"
 
 [requires]
 python_version = "3.7"
