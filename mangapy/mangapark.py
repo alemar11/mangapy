@@ -55,39 +55,43 @@ class MangaParkRepository(MangaRepository):
                     '''    
                     return None
 
-                chapters_detail = content.select('a.ml-1')
-
-                if chapters_detail is None:
-                    return None
-
-                chapters_url = map(lambda c: c['href'], reversed(chapters_detail))
-                manga_chapters = []
-                
-                for url in chapters_url:
-                    splits = chapter_relative_url = url.rsplit('/', 1)
-                    last_path = splits[-1]
-                    chapter_relative_url = url
-                    try:
-                        prefix = last_path[0]
-                        if prefix.lower() == 'c':
-                            chapter_number = float(last_path[1:])  # if it's a float, we can get the chapter number
-                            chapter_relative_url = splits[0]
-                        else: # one volume
-                            chapter_number = float(0)    
-                            chapter_relative_url = url
-                    except ValueError:
-                        chapter_number = 0
-                        pass  # it was a string, not a float.
-
-                    chapter_url = "{0}{1}".format(self.base_url, chapter_relative_url)
-                    chapter = MangaParkChapter(chapter_url, chapter_number)
-                    manga_chapters.append(chapter)
+                manga_chapters = self.parse_chapters(content)
                 
                 manga = Manga(
                     manga_name,
                     manga_chapters
                 )
                 return manga
+
+    def parse_chapters(self, content):
+        chapters_detail = content.select('a.ml-1')
+        if chapters_detail is None:
+            return None
+
+        chapters_url = map(lambda c: c['href'], reversed(chapters_detail))
+        manga_chapters = []
+        
+        for url in chapters_url:
+            splits = chapter_relative_url = url.rsplit('/', 1)
+            last_path = splits[-1]
+            chapter_relative_url = url
+            try:
+                prefix = last_path[0]
+                if prefix.lower() == 'c':
+                    chapter_number = float(last_path[1:])  # if it's a float, we can get the chapter number
+                    chapter_relative_url = splits[0]
+                else: # one volume
+                    chapter_number = float(0)    
+                    chapter_relative_url = url
+            except ValueError:
+                chapter_number = 0
+                pass  # it was a string, not a float.
+
+            chapter_url = "{0}{1}".format(self.base_url, chapter_relative_url)
+            chapter = MangaParkChapter(chapter_url, chapter_number)
+            manga_chapters.append(chapter)
+        return manga_chapters
+
 
 
 class MangaParkChapter(Chapter):
@@ -116,7 +120,7 @@ class MangaParkChapter(Chapter):
 
 
 
-'''
+
 if __name__ == "__main__":
     import asyncio
     loop = asyncio.get_event_loop()
@@ -147,4 +151,3 @@ if __name__ == "__main__":
         #https://www.educative.io/blog/python-concurrency-making-sense-of-asyncio    
         loop.run_until_complete(asyncio.wait(tasks))
         loop.close()
-'''
