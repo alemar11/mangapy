@@ -23,7 +23,7 @@ def test_parse_manga_first_chapter():
         count += 1
         assert page.number is not None
         assert page.url is not None
-    assert count == 46, "The first Naruto chapter sould contain 46 pages"    
+    assert count == 46, "The first Naruto chapter sould contain 46 pages"
 
 
 def test_parse_manga_last_chapter():
@@ -39,7 +39,7 @@ def test_parse_manga_last_chapter():
         count += 1
         assert page.number is not None
         assert page.url is not None
-    assert count == 46, "The last Naruto chapter sould contain 18 pages"    
+    assert count == 46, "The last Naruto chapter sould contain 18 pages"
 
 
 def test_parse_mangapark_adult_content():
