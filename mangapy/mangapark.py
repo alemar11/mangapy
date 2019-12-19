@@ -127,14 +127,10 @@ class MangaParkChapter(Chapter):
                 return pages
 
 
-
-
 if __name__ == "__main__":
     import asyncio
     loop = asyncio.get_event_loop()
     repository = MangaParkRepository()
-
-    #manga = asyncio.run(repository.search("naruto"))
     manga = asyncio.run(repository.search("naruto"))
 
     if manga is not None:
@@ -154,6 +150,5 @@ if __name__ == "__main__":
             #download(thirdChapter, path)
             ]
 
-        #https://www.educative.io/blog/python-concurrency-making-sense-of-asyncio    
         loop.run_until_complete(asyncio.wait(tasks))
         loop.close()

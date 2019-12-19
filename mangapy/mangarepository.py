@@ -4,6 +4,7 @@ from mangapy import downloader
 import asyncio
 import aiohttp
 import os
+import re
 
 
 class Manga:
@@ -14,6 +15,10 @@ class Manga:
     @property
     def latest(self):
         return self.chapters[-1]
+
+    @property
+    def subdirectory(self):
+        return re.sub(r'[^A-Za-z0-9]+', '_', re.sub(r'^[^A-Za-z0-9]+|[^A-Za-z0-9]+$', '', self.title)).lower()
 
 
 class Chapter:

@@ -2,6 +2,7 @@ import asyncio
 import sys
 import pkg_resources
 import argparse
+import os
 
 from mangapy.mangapark import MangaParkRepository
 from mangapy.mangarepository import download
@@ -47,6 +48,7 @@ def main():
 
     repository = MangaParkRepository()
     manga = asyncio.run(repository.search(title))
+    directory = os.path.join(directory, 'mangapark', manga.subdirectory)
     tasks = []
 
     if manga is None or len(manga.chapters) <= 0:
@@ -77,8 +79,8 @@ def main():
             if args.end and chapter.number == args.end:
                 stop = index + 1
         for chapter in manga.chapters[start:stop]:
-            #manga.get(chapter)
-            print("get multiple chapters here")
+            # TODO: test
+            tasks.append(download(chapter, directory))
 
     else:
         last_chapter = manga.chapters[-1]
