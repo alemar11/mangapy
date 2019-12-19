@@ -33,34 +33,33 @@ class MangaParkRepository(MangaRepository):
                 # 6 rock
                 # 4 duck
                 # 101 mini
-
-                '''
-                TODO: possible optimization
-                fetch the last chapter for every streams and determine the stream that has
-                the bigger chapter (decimal excluded) and most recently updated
-                '''
-
                 streams = ['stream_1', 'stream_3', 'stream_6', 'stream_4', 'stream_101']
-                content = None
+                contents = {}
                 for stream in streams:
+                    print(stream)
                     content = soup.find('div', {'id': stream})
                     if content is not None:
-                        break
+                        list = self.parse_chapters(content)
+                        if list is not None:
+                            print("     content found")
+                            contents[stream] = list
+                        else:
+                            print("     content NOT found")    
 
-                if content is None:
-                    '''
-                    warning = soup.find('div', {'class': 'warning'})
-                    if warning is not None:
-                        print("Adult content")
-                    '''    
-                    return None
+                last_chapter_number = -1
+                most_updated_stream = None
 
-                manga_chapters = self.parse_chapters(content)
+                for stream, chapters in contents.items():
+                    max_chapter_number = max(chapter.number for chapter in chapters)
+                    if max_chapter_number is not None and max_chapter_number > last_chapter_number:
+                        last_chapter_number = max_chapter_number
+                        manga_chapters = chapters
+                        most_updated_stream = stream
+
+                manga_chapters = contents[most_updated_stream]
+                print("Using: " + most_updated_stream + ' with last chapter: ' + str(last_chapter_number))
                 
-                manga = Manga(
-                    manga_name,
-                    manga_chapters
-                )
+                manga = Manga(manga_name, manga_chapters)
                 return manga
 
     def parse_chapters(self, content):
@@ -68,30 +67,39 @@ class MangaParkRepository(MangaRepository):
         if chapters_detail is None:
             return None
 
-        chapters_url = map(lambda c: c['href'], reversed(chapters_detail))
-        manga_chapters = []
-        
-        for url in chapters_url:
-            splits = chapter_relative_url = url.rsplit('/', 1)
-            last_path = splits[-1]
-            chapter_relative_url = url
-            try:
-                prefix = last_path[0]
-                if prefix.lower() == 'c':
-                    chapter_number = float(last_path[1:])  # if it's a float, we can get the chapter number
-                    chapter_relative_url = splits[0]
-                else: # one volume
-                    chapter_number = float(0)    
-                    chapter_relative_url = url
-            except ValueError:
-                chapter_number = 0
-                pass  # it was a string, not a float.
+        class Metadata:
+            def __init__(self, url, title):
+                self.url = url
+                self.title = title
 
-            chapter_url = "{0}{1}".format(self.base_url, chapter_relative_url)
-            chapter = MangaParkChapter(chapter_url, chapter_number)
-            manga_chapters.append(chapter)
-        return manga_chapters
+        manga_chapters = {}
+        chapters_metadata = map(lambda c: Metadata(c['href'], c.string), reversed(chapters_detail))
 
+        for metadata in chapters_metadata:
+            # https://regex101.com/r/PFFb5l/9/
+            # any minor version discovered (i.e. 11.4) will update the major version (i.e. 11)
+            match = re.search(r'((?<=ch.)([0-9]*)|(?<=Chapter)\s*-?([0-9]*))', metadata.title)
+            if match is not None:
+                try:
+                    number = match.group(1) or 0
+                    number = int(number)
+                except ValueError:
+                    number = 0
+            else:
+                number = 0         
+
+            if number == 0:
+                print('❌ ' + metadata.title)
+                # TODO: skip side stories inside volumes unless the volume is the 0 or 1
+                # but if there is vol.0  without chapter it's ok to keepet (test with naruto)
+
+            url = metadata.url
+            chapter_url = "{0}{1}".format(self.base_url, url)
+            chapter = MangaParkChapter(chapter_url, abs(number))
+            manga_chapters[number] = chapter
+
+        sorted_chapters = sorted(manga_chapters.values(), key=lambda x: x.number, reverse=False)    
+        return sorted_chapters
 
 
 class MangaParkChapter(Chapter):
@@ -126,16 +134,14 @@ if __name__ == "__main__":
     loop = asyncio.get_event_loop()
     repository = MangaParkRepository()
 
+    #manga = asyncio.run(repository.search("naruto"))
     manga = asyncio.run(repository.search("naruto"))
 
-    #manga = repository.search("naruto")
-
     if manga is not None:
-        print(len(manga.chapters))
         firstChapter = manga.chapters[0]
         secondChapter = manga.chapters[1]
         thirdChapter = manga.chapters[2]
-        lastChapter = manga.chapters[-1]
+        lastChapter = manga.latest
         #asyncio.run(firstChapter.download(path='~/Downloads/mangapy'))
         #asyncio.run(download(firstChapter, '~/Downloads/mangapy'))
 

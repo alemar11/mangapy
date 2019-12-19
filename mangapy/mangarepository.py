@@ -13,7 +13,7 @@ class Manga:
 
     @property
     def latest(self):
-        return self.manga.chapters[-1]
+        return self.chapters[-1]
 
 
 class Chapter:

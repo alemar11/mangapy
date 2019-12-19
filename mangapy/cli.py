@@ -57,7 +57,7 @@ def main():
             tasks.append(download(chapter, directory))
     elif args.chapter:
         try:
-            chapter_number = float(args.chapter.strip())
+            chapter_number = int(args.chapter.strip())
         except ValueError:
             sys.exit("Invalid chapter number.")
 
