@@ -44,15 +44,22 @@ def pdf(directory):
     images_path = natural_sort(images_path)
     images = []
     for path in images_path:
+        print(path)
         images.append(Image.open(path))
 
     pdf_filename = os.path.join(directory, 'chapter.pdf')
     first_image = images.pop(0)
     first_image.save(pdf_filename, "PDF", resolution=100.0, save_all=True, append_images=images)
 
+
 import re
 
-def natural_sort(l):
-    convert = lambda text: int(text) if text.isdigit() else text.lower()
-    alphanum_key = lambda key: [convert(c) for c in re.split('([0-9]+)', key)]
-    return sorted(l, key = alphanum_key)
+
+def natural_sort(list):
+    def convert(text):
+        return int(text) if text.isdigit() else text.lower()
+
+    def alphanum_key(key):
+        return [convert(c) for c in re.split('([0-9]+)', key)]
+
+    return sorted(list, key=alphanum_key)
