@@ -95,7 +95,7 @@ def main():
 
 if __name__ == '__main__':
     #sys.argv.insert(1, "Naruto - Eroi no Vol.1 (Doujinshi)")
-    sys.argv.insert(1, "naruto")
+    sys.argv.insert(1, "bleach")
     sys.argv.insert(2, "-d ~/Downloads/mangapy")
     sys.argv.insert(2, "-c 2")
     main()

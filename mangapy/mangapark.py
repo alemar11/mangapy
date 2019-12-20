@@ -90,12 +90,14 @@ class MangaParkRepository(MangaRepository):
                 except ValueError:
                     number = 0
             else:
-                number = 0         
+                number = 0
 
-            if number == 0:
-                print('❌ ' + metadata.title)
-                # TODO: skip side stories inside volumes unless the volume is the 0 or 1
-                # but if there is vol.0  without chapter it's ok to keepet (test with naruto)
+            if number == 0 and number in manga_chapters.keys():
+                # some streams uses ch 0 in different volumes to identify side stories
+                # i.e. Vol.23 Chapter 0: Side-A the sand
+                # those chapter will be skipped
+                print('❌ skipping:' + metadata.title)
+                continue
 
             url = metadata.url
             chapter_url = "{0}{1}".format(self.base_url, url)
