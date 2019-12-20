@@ -38,24 +38,21 @@ async def save(session, url, path, file_name):
 
 
 def pdf(directory):
-    images_path = glob.glob('/Users/amarzoli/Downloads/mangapy/mangapark/naruto/1/*.jpg')
+    directory = os.path.expanduser(directory)
+    search_path = os.path.join(directory, '*.jpg')
+    images_path = glob.glob(search_path)
+    images_path = natural_sort(images_path)
     images = []
-    # ---> https://stackoverflow.com/questions/4836710/does-python-have-a-built-in-function-for-string-natural-sort
-
     for path in images_path:
-        print(path)
         images.append(Image.open(path))
 
-    pdf_filename = "/Users/amarzoli/Downloads/mangapy/mangapark/naruto/1/chapter.pdf"
-
-    #os.listdir('/Users/amarzoli/Downloads/mangapy/mangapark/naruto/1/')
-
-    #list = glob.glob('{0}/*.jpg'.format(directory))
-    # https://stackoverflow.com/questions/27327513/create-pdf-from-a-list-of-images
-    #im1 = Image.open("/Users/apple/Desktop/bbd.jpg")
-    #im2 = Image.open("/Users/apple/Desktop/bbd1.jpg")
-    #im3 = Image.open("/Users/apple/Desktop/bbd2.jpg")
-    #im_list = [im2, im3]
-    #pdf1_filename = "/Users/apple/Desktop/bbd1.pdf"
-    first_image = images.pop()
+    pdf_filename = os.path.join(directory, 'chapter.pdf')
+    first_image = images.pop(0)
     first_image.save(pdf_filename, "PDF", resolution=100.0, save_all=True, append_images=images)
+
+import re
+
+def natural_sort(l):
+    convert = lambda text: int(text) if text.isdigit() else text.lower()
+    alphanum_key = lambda key: [convert(c) for c in re.split('([0-9]+)', key)]
+    return sorted(l, key = alphanum_key)
