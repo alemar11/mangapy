@@ -6,6 +6,7 @@ import time
 # https://github.com/CaliDog/asyncpool
 # https://www.aeracode.org/2018/02/19/python-async-simplified/
 
+
 async def worker(name, queue):
     while True:
         # Get a "work item" out of the queue.
