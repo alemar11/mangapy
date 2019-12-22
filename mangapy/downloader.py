@@ -1,3 +1,4 @@
+import aiohttp
 import glob
 import os
 from PIL import Image
@@ -8,7 +9,7 @@ class MangaException(Exception):
     pass
   
 
-async def fetch(session, url):
+async def fetch(session: aiohttp.ClientSession, url: str):
     try:
         async with session.get(url) as response:
             if response.status != 200 and response.content is not None:
@@ -19,7 +20,7 @@ async def fetch(session, url):
         print(msg)
 
 
-async def save(session, url, path, file_name):
+async def save(session: aiohttp.ClientSession, url: str, path: str, file_name: str):
     file_ext = urlparse(url).path.split('.')[-1]
     data = await fetch(session, url)
     if data is None:
@@ -35,7 +36,6 @@ async def save(session, url, path, file_name):
     output = open(file, "wb")
     output.write(data)
     output.close()
-
 
 def pdf(directory):
     directory = os.path.expanduser(directory)
