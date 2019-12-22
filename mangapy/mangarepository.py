@@ -47,6 +47,8 @@ class Chapter:
         '''
 
 
+from tqdm import tqdm
+
 async def download(chapter: Chapter, to: str):
     async with aiohttp.ClientSession() as session:
         to = os.path.join(to, str(chapter.number))
@@ -55,6 +57,19 @@ async def download(chapter: Chapter, to: str):
         for page in _pages:
             url = page.url
             tasks.append(downloader.save(session, url, to, str(page.number)))
+
+        kwargs = {
+            'total': len(tasks),
+            'unit': 'it',
+            'unit_scale': True,
+            'leave': True
+        }
+        #Print out the progress as tasks complete
+        for f in tqdm(asyncio.as_completed(tasks), **kwargs):
+            pass
+            #await f
+           
+
         await asyncio.gather(*tasks)
         downloader.pdf(to)
 
