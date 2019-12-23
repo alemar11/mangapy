@@ -54,9 +54,11 @@ def gen_url(lower=0, upper=None):
 if __name__ == "__main__":
     from mangapy.mangapark import MangaParkRepository
 
-    repository = MangaParkRepository()
-    manga = repository.search("naruto")
+    #repository = MangaParkRepository()
+    #manga = repository.search("naruto")
 
+    from tqdm import trange
+    from time import sleep
 
     ad = AsyncDownloader(concurrent_connections=30)
     data = ad.download([g for g in gen_url(upper=1000)])

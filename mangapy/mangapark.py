@@ -27,7 +27,6 @@ class MangaParkRepository(MangaRepository):
         async with aiohttp.ClientSession() as session:
             async with session.get(url=manga_url, cookies=self.cookies) as response:
                 if response is None or response.status != 200:
-
                     return None
 
                 body = await response.content.read()
@@ -139,7 +138,6 @@ class MangaParkChapter(Chapter):
 
 
 if __name__ == "__main__":
-    import asyncio
     loop = asyncio.get_event_loop()
     repository = MangaParkRepository()
     manga = repository.search("naruto")
