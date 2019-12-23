@@ -1,4 +1,5 @@
 import aiohttp
+import asyncio
 import json
 import re
 
@@ -16,7 +17,11 @@ class MangaParkRepository(MangaRepository):
     def suggest(self, manga_name):
         return None
 
-    async def search(self, title):
+    def search(self, title):
+        loop = asyncio.get_event_loop()
+        return loop.run_until_complete(self._search(title))
+
+    async def _search(self, title):
         manga_name_adjusted = re.sub(r'[^A-Za-z0-9]+', '-', re.sub(r'^[^A-Za-z0-9]+|[^A-Za-z0-9]+$', '', title)).lower()
         manga_url = "{0}/manga/{1}".format(self.base_url, manga_name_adjusted)
         async with aiohttp.ClientSession() as session:
@@ -137,7 +142,8 @@ if __name__ == "__main__":
     import asyncio
     loop = asyncio.get_event_loop()
     repository = MangaParkRepository()
-    manga = asyncio.run(repository.search("naruto"))
+    manga = repository.search("naruto")
+    manga = repository.search("naruto")
 
     if manga is not None:
         firstChapter = manga.chapters[0]

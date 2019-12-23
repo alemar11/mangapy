@@ -47,7 +47,7 @@ def main():
     directory = args.dir.strip()
 
     repository = MangaParkRepository()
-    manga = asyncio.run(repository.search(title))
+    manga = repository.search(title)
     directory = os.path.join(directory, 'mangapark', manga.subdirectory)
     tasks = []
 
@@ -86,8 +86,9 @@ def main():
         last_chapter = manga.chapters[-1]
         tasks.append(download(last_chapter, directory))
 
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
+    #loop = asyncio.new_event_loop()
+    #asyncio.set_event_loop(loop)
+    loop = asyncio.get_event_loop()
     #https://www.educative.io/blog/python-concurrency-making-sense-of-asyncio 
     loop.run_until_complete(asyncio.wait(tasks))
     loop.close()

@@ -19,13 +19,7 @@ async def fetch(session: aiohttp.ClientSession, url: str):
     except OSError as msg:
         print(msg)
 
-
-from random import randint
-from time import sleep
-
 async def save(session: aiohttp.ClientSession, url: str, path: str, file_name: str):
-    print("start {0}", url)
-    sleep(randint(0,3))
     file_ext = urlparse(url).path.split('.')[-1]
     data = await fetch(session, url)
     if data is None:
@@ -41,7 +35,6 @@ async def save(session: aiohttp.ClientSession, url: str, path: str, file_name: s
     output = open(file, "wb")
     output.write(data)
     output.close()
-    print('end {0}', url)
 
 def pdf(directory):
     directory = os.path.expanduser(directory)
