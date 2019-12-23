@@ -91,8 +91,6 @@ def main():
     loop = asyncio.get_event_loop()
     #https://www.educative.io/blog/python-concurrency-making-sense-of-asyncio 
     loop.run_until_complete(asyncio.wait(tasks))
-    loop.close()
-
 
 if __name__ == '__main__':
     #sys.argv.insert(1, "Naruto - Eroi no Vol.1 (Doujinshi)")
