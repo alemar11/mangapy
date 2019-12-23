@@ -36,7 +36,7 @@ class AsyncDownloader(object):
         content = await task
 
     def download(self, urls):
-        self.progress_bar = tqdm(urls, total=len(urls), desc='Reveived', unit='requests')
+        self.progress_bar = tqdm(urls, total=len(urls), desc='Chapter', unit='pages')
         self.progress_bar.update(0)
 
         tasks = self.batch_download(urls)
