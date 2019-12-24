@@ -1,9 +1,10 @@
 
-from collections import namedtuple
 import re
+from abc import ABC, abstractmethod
+from collections import namedtuple
 
 
-class Manga:
+class Manga(ABC):
     def __init__(self, title, chapters):
         self.title = title
         self.chapters = chapters
@@ -19,22 +20,22 @@ class Manga:
         return re.sub(r'[^A-Za-z0-9]+', '_', re.sub(r'^[^A-Za-z0-9]+|[^A-Za-z0-9]+$', '', self.title)).lower()
 
 
-class Chapter:
+class Chapter(ABC):
     def __init__(self, first_page_url, number):
         self.first_page_url = first_page_url
         self.number = number
 
+    @abstractmethod
     def pages(self):
-        # chapter pages
-        raise Exception('pages should be implemented in a subclass')
+        pass
 
 
 Page = namedtuple("Page", "number url")
 
 
-class MangaRepository:
+class MangaRepository(ABC):
     base_url = None
 
+    @abstractmethod
     def search(self, title):
-        # search for a mange with the given title
-        return None
+        pass

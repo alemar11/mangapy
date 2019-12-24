@@ -2,7 +2,6 @@ import aiohttp
 import asyncio
 import json
 import re
-
 from mangapy.mangarepository import MangaRepository, Manga, Chapter, Page
 from bs4 import BeautifulSoup
 
@@ -11,11 +10,6 @@ class MangaParkRepository(MangaRepository):
     name = "MangaPark"
     base_url = "https://mangapark.net"
     cookies = {'set': 'theme=1&h=1&img_load=5&img_zoom=1&img_tool=1&twin_m=0&twin_c=0&manga_a_warn=1&history=1&timezone=14'}
-
-    # TODO: @property and static methods
-
-    def suggest(self, manga_name):
-        return None
 
     def search(self, title):
         loop = asyncio.new_event_loop()
@@ -138,30 +132,3 @@ class MangaParkChapter(Chapter):
                             url = 'https:' + page['u']
                         pages.append(Page(page['n'], url))
                 return pages
-
-
-if __name__ == "__main__":
-    loop = asyncio.get_event_loop()
-    repository = MangaParkRepository()
-    manga = repository.search("naruto")
-    manga = repository.search("naruto")
-
-    if manga is not None:
-        firstChapter = manga.chapters[0]
-        secondChapter = manga.chapters[1]
-        thirdChapter = manga.chapters[2]
-        lastChapter = manga.latest
-        #asyncio.run(firstChapter.download(path='~/Downloads/mangapy'))
-        #asyncio.run(download(firstChapter, '~/Downloads/mangapy'))
-
-        path = '~/Downloads/mangapy'
-
-        tasks = [
-            #download(lastChapter, path),
-            #download(firstChapter, path),
-            #download(secondChapter, path),
-            #download(thirdChapter, path)
-            ]
-
-        loop.run_until_complete(asyncio.wait(tasks))
-        loop.close()
