@@ -5,8 +5,9 @@ import os
 
 from mangapy.mangarepository import Chapter
 from mangapy.mangapark import MangaParkRepository
+from mangapy.chapter_downloader import ChapterDownloader
 from threading import Thread, Semaphore
-from chapter_downloader import ChapterDownloader
+
 
 semaphore = Semaphore(3)
 version = pkg_resources.require("mangapy")[0].version
