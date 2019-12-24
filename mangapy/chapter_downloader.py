@@ -20,7 +20,7 @@ class ChapterDownloader(object):
         self.progress_bar = None
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
-        self.semaphore = asyncio.Semaphore(concurrent_connections, loop=self.loop)  
+        self.semaphore = asyncio.Semaphore(concurrent_connections, loop=self.loop)
 
     def __del__(self):
         self.loop.close()
