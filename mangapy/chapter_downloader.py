@@ -1,12 +1,11 @@
-from aiohttp import ClientSession
 import asyncio
-from tqdm import tqdm
 import os
-from PIL import Image
 import glob
+from aiohttp import ClientSession
+from tqdm import tqdm
+from PIL import Image
 from urllib.parse import urlparse
 from mangapy.mangarepository import Chapter
-from threading import Thread, Semaphore
 
 
 class MangaException(Exception):
@@ -75,34 +74,3 @@ class ChapterDownloader(object):
                 tasks.append(self.save(session, url, to, str(page.number)))
 
             await asyncio.gather(*tasks)
-
-
-
-
-semaphore = Semaphore(1)
-
-def do_stuff(c: Chapter):
-    semaphore.acquire()
-    cd = ChapterDownloader()
-    cd.start(c,'~/Downloads/__man')
-    semaphore.release()
-
-def main():
-    from mangapy.mangapark import MangaParkRepository
-    repository = MangaParkRepository()
-    manga = repository.search("black-clover-tabata-yuuki")
-    if manga is not None:
-        firstChapter = manga.chapters[0]
-        secondChapter = manga.chapters[1]
-        thirdChapter = manga.chapters[2]
-        lastChapter = manga.latest
-       
-        chapters = [firstChapter, secondChapter, thirdChapter, lastChapter]
-
-        threads = [Thread(target=do_stuff, args=(c,)) for c in chapters]
-        [thread.start() for thread in threads]
-        [thread.join() for thread in threads]
-
-
-if __name__ == "__main__":
-    main()
