@@ -67,7 +67,7 @@ class ChapterDownloader(object):
             tasks = []
             _pages = await chapter.pages()
             description = ('Chapter {0}'.format(str(chapter.number)))
-            self.progress_bar = tqdm(_pages, total=len(_pages), desc=description, unit='pages')
+            self.progress_bar = tqdm(_pages, total=len(_pages), desc=description, unit='pages', ncols=100)
             self.progress_bar.update(0)
 
             for page in _pages:
