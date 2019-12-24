@@ -9,6 +9,7 @@ pylint = "*"
 v = {editable = true,version = "*"}
 pytest = "*"
 rope = "*"
+pyexecjs = "*"
 
 [packages]
 bs4 = "*"
@@ -20,6 +21,7 @@ pillow = "*"
 pytest = "*"
 tqdm = "*"
 uvloop = "*"
+pyexecjs = "*"
 
 [requires]
 python_version = "3.7"
