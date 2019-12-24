@@ -86,7 +86,7 @@ class MangaParkRepository(MangaRepository):
 
         for metadata in chapters_metadata:
             # https://regex101.com/r/PFFb5l/9/
-            match = re.search(r'((?<=ch.)([0-9]*)|(?<=Chapter)\s*-?([0-9]*))', metadata.title)
+            match = re.search(r'((?<=ch.)([0-9]*)|(?<=Chapter)\s*-?([0-9]*[.]?[0-9])|(?<=Page)\s*-?([0-9]*[.]?[0-9]))', metadata.title)
             if match is not None:
                 try:
                     number = match.group(1) or 0
@@ -101,7 +101,7 @@ class MangaParkRepository(MangaRepository):
                 # i.e. Vol.23 Chapter 0: Side-A the sand
                 # those chapter will be skipped
                 print('❌ skipping:' + metadata.title)
-                continue
+                continue        
 
             url = metadata.url
             chapter_url = "{0}{1}".format(self.base_url, url)
