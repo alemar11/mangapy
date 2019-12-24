@@ -3,7 +3,7 @@ import asyncio
 import json
 import re
 
-from mangapy.mangarepository import MangaRepository, Manga, Chapter, Page, download
+from mangapy.mangarepository import MangaRepository, Manga, Chapter, Page
 from bs4 import BeautifulSoup
 
 
@@ -157,7 +157,7 @@ if __name__ == "__main__":
         path = '~/Downloads/mangapy'
 
         tasks = [
-            download(lastChapter, path),
+            #download(lastChapter, path),
             #download(firstChapter, path),
             #download(secondChapter, path),
             #download(thirdChapter, path)
