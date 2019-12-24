@@ -6,13 +6,13 @@ from mangapy.mangapark import MangaParkRepository
 
 def test_parse_not_existing_manga():
     repository = MangaParkRepository()
-    manga = asyncio.run(repository.search('this manga doesn\'t exists'))
+    manga = repository.search('this manga doesn\'t exists')
     assert manga is None
 
 
 def test_parse_manga():
     repository = MangaParkRepository()
-    manga = asyncio.run(repository.search('naruto'))
+    manga = repository.search('naruto')
     assert manga is not None
     assert len(manga.chapters) == 701, "It should contain 701 chapters"
     firstChapter = manga.chapters[0]
@@ -38,7 +38,7 @@ def test_parse_manga():
 
 def test_parse_mangapark_adult_content():
     repository = MangaParkRepository()
-    manga = asyncio.run(repository.search('emergence'))
+    manga = repository.search('emergence')
     assert manga is not None
     assert len(manga.chapters) == 7, "It should contain 7 chapters"
     firstChapter = manga.chapters[0]
@@ -51,7 +51,7 @@ def test_parse_mangapark_adult_content():
 
 def test_parse_mangapark_adult_content_with_single_volume():
     repository = MangaParkRepository()
-    manga = asyncio.run(repository.search('Naruto - Eroi no Vol.1 (Doujinshi)'))
+    manga = repository.search('Naruto - Eroi no Vol.1 (Doujinshi)')
     assert manga is not None
     assert len(manga.chapters) == 1, "It should contain only 1 chapter"
     firstChapter = manga.chapters[0]

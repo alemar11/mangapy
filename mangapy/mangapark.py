@@ -18,8 +18,11 @@ class MangaParkRepository(MangaRepository):
         return None
 
     def search(self, title):
-        loop = asyncio.get_event_loop()
-        return loop.run_until_complete(self._search(title))
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        result = loop.run_until_complete(self._search(title))
+        loop.close()
+        return result
 
     async def _search(self, title):
         manga_name_adjusted = re.sub(r'[^A-Za-z0-9]+', '-', re.sub(r'^[^A-Za-z0-9]+|[^A-Za-z0-9]+$', '', title)).lower()
@@ -85,7 +88,7 @@ class MangaParkRepository(MangaRepository):
         chapters_metadata = map(lambda c: Metadata(c['href'], c.string), reversed(chapters_detail))
 
         for metadata in chapters_metadata:
-            # https://regex101.com/r/PFFb5l/9/
+            # https://regex101.com/r/PFFb5l/10
             match = re.search(r'((?<=ch.)([0-9]*)|(?<=Chapter)\s*-?([0-9]*[.]?[0-9])|(?<=Page)\s*-?([0-9]*[.]?[0-9]))', metadata.title)
             if match is not None:
                 try:
