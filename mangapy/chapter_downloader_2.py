@@ -6,31 +6,30 @@ from tqdm import tqdm
 from PIL import Image
 from urllib.parse import urlparse
 from mangapy.mangarepository import Chapter, Page
-from mangapy.fanfox import FanFoxRepository, session
+from mangapy.fanfox import FanFoxRepository
 from concurrent.futures import ThreadPoolExecutor
 
 
-
-
-
 class ChapterDownloader2(object):    
-    def __init__(self, max_workers=1, session=requests.Session):
-        self.max_workers = max_workers
-        self.progress_bar = None
-        self.session = session
+    session = requests.Session()
 
-    def fetch(self, url: str):
+    def __init__(self, path: str, max_workers=1):
+        self.max_workers = max_workers
+        self.path = path
+
+    def _fetch(self, url: str):
         response = self.session.get(url)
         if response.status_code != 200:
             return None
         return response.content
             
-    def save(self, to: str, page: Page):
+    def _save(self, to: str, page: Page):
         url = page.url
         file_name = str(page.number)
         file_ext = urlparse(url).path.split('.')[-1]
-        url = 'http:' + url
-        data = self.fetch(url)
+        if url.startswith('//'):
+            url = 'http:' + url
+        data = self._fetch(url)
         if data is None:
             return
         dir = os.path.expanduser(to)
@@ -45,18 +44,17 @@ class ChapterDownloader2(object):
         output.write(data)
         output.close()
 
-    def download(self, chapter: Chapter, to: str):
-        to = os.path.join(to, str(chapter.number))
-        _pages = chapter.pages()
+    def download(self, chapter: Chapter):
+        to = os.path.join(self.path, str(chapter.number))
+        pages = chapter.pages()
         description = ('Chapter {0}'.format(str(chapter.number)))
-        # currying
-        func = partial(self.save, to)
+        func = partial(self._save, to) # currying
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            list(tqdm(executor.map(func, _pages), total=len(_pages), desc=description, unit='pages', ncols=100))
+            list(tqdm(executor.map(func, pages), total=len(pages), desc=description, unit='pages', ncols=100))
 
 
 repo = FanFoxRepository()
 manga = repo.search('naruto')
-second_ch = manga.chapters[2]
-d = ChapterDownloader2(session=session)
-d.download(second_ch, '~/Downloads/_mangapy2')            
+second_ch = manga.chapters[3]
+d = ChapterDownloader2('~/Downloads/_mangapy11')
+d.download(second_ch)            
