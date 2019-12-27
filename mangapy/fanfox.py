@@ -68,7 +68,12 @@ class FanFoxRepository(MangaRepository):
 
 
 class FanFoxChapter(Chapter):
-    def _get_links(self, content):
+    # def __init__(self, first_page_url, number, session: requests.Session):
+    #     self.first_page_url = first_page_url
+    #     self.number = number
+    #     self.session = session
+
+    def _get_urls(self, content):
         js = re.search(r'eval\((function\b.+)\((\'[\w ].+)\)\)', content).group(0)
         encrypted = js.split('}(')[1][:-1]
         unpacked = eval('unpack(' + encrypted) 
@@ -112,7 +117,7 @@ class FanFoxChapter(Chapter):
         links = []
         for i in range(0, int(last_page_number / 2 + .5)):
             data = self._one_link_helper(soup.text, (i * 2) + 1, base_url)
-            links += self._parse_links(self._get_links(data))
+            links += self._parse_links(self._get_urls(data))
 
         pages = []
         for i, link in enumerate(links):
