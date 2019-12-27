@@ -1,15 +1,13 @@
 import re
 import requests
-
 from mangapy.mangarepository import MangaRepository, Manga, Chapter, Page
 from bs4 import BeautifulSoup
-from fake_useragent import UserAgent
-
-def baseN(num, b, numerals="0123456789abcdefghijklmnopqrstuvwxyz"):
-    return ((num == 0) and numerals[0]) or (baseN(num // b, b, numerals).lstrip(numerals[0]) + numerals[num % b])
 
 
 def unpack(p, a, c, k, e=None, d=None):
+    def baseN(num, b, numerals="0123456789abcdefghijklmnopqrstuvwxyz"):
+        return ((num == 0) and numerals[0]) or (baseN(num // b, b, numerals).lstrip(numerals[0]) + numerals[num % b])
+        
     while (c):
         c -= 1
         if (k[c]):
@@ -17,31 +15,35 @@ def unpack(p, a, c, k, e=None, d=None):
     return p
 
 
-session = requests.Session()
-
-headers = {
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=1.0,image/webp,image/apng,*/*;q=1.0', 
-    'Accept-Encoding': 'gzip, deflate',
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.101 Safari/537.36',
-    'Accept-Language': 'ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3',
-    'Referer': 'http://fanfox.net',
-    'Connection': 'keep-alive'
-    }
-
-session.cookies['isAdult'] = '1'
-session.headers = headers
-
-
 class FanFoxRepository(MangaRepository):
     name = "FanFox"
     base_url = "http://fanfox.net"
+    _session = None
+
+    @property
+    def session(self):
+        if self._session is not None:
+            return self._session
+
+        self._session = requests.Session()
+        headers = {
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=1.0,image/webp,image/apng,*/*;q=1.0', 
+            'Accept-Encoding': 'gzip, deflate',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.101 Safari/537.36',
+            'Accept-Language': 'ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3',
+            'Referer': 'http://fanfox.net',
+            'Connection': 'keep-alive'
+            }
+
+        self._session.cookies['isAdult'] = '1'
+        self._session.headers = headers
+        return self._session
 
     def search(self, manga_name):
         # support alphanumeric names with multiple words
         manga_name_adjusted = re.sub(r'[^A-Za-z0-9]+', '_', re.sub(r'^[^A-Za-z0-9]+|[^A-Za-z0-9]+$', '', manga_name)).lower()
         manga_url = "{0}/manga/{1}".format(self.base_url, manga_name_adjusted)
-        
-        response = session.get(url=manga_url)
+        response = self.session.get(url=manga_url)
 
         if response is None or response.status_code != 200:
             return None
@@ -60,7 +62,7 @@ class FanFoxRepository(MangaRepository):
         for url in chapters_url:
             number = url.split("/")[-2][1:]  # relative url, todo: regex
             absolute_url = "{0}{1}".format(self.base_url, url)
-            chapter = FanFoxChapter(absolute_url, number)
+            chapter = FanFoxChapter(absolute_url, number, self.session)
             manga_chapters.append(chapter)
         
         manga = Manga(manga_name, manga_chapters)
@@ -68,10 +70,10 @@ class FanFoxRepository(MangaRepository):
 
 
 class FanFoxChapter(Chapter):
-    # def __init__(self, first_page_url, number, session: requests.Session):
-    #     self.first_page_url = first_page_url
-    #     self.number = number
-    #     self.session = session
+    def __init__(self, first_page_url, number, session: requests.Session):
+        self.first_page_url = first_page_url
+        self.number = number
+        self.session = session
 
     def _get_urls(self, content):
         js = re.search(r'eval\((function\b.+)\((\'[\w ].+)\)\)', content).group(0)
@@ -94,7 +96,11 @@ class FanFoxChapter(Chapter):
         cid = re.search(r'chapterid\s*=\s*(\d+)', content).group(1)
         key = self._get_key(content)
         final_url = '{}/chapterfun.ashx?cid={}&page={}&key={}'.format(base_url, cid, page, key)
-        response = session.get(final_url, headers=headers)
+        response = self.session.get(final_url)
+
+        if response is None or response.status_code != 200:
+            return None
+
         content = response.text
         return content
 
@@ -105,12 +111,14 @@ class FanFoxChapter(Chapter):
 
     def pages(self):
         base_url = self.first_page_url[:self.first_page_url.rfind('/')]
-        response = session.get(self.first_page_url, headers=headers)
-        content = response.text
+        response = self.session.get(self.first_page_url)
 
+        if response is None or response.status_code != 200:
+            return None
+
+        content = response.text
         soup = BeautifulSoup(content, features="html.parser")
         page_numbers = soup.findAll("a", {"data-page": True})
-
         page_numbers = map(lambda x: int(x['data-page']), page_numbers)
         last_page_number = max(page_numbers)
         
