@@ -97,7 +97,7 @@ class MangaParkRepository(MangaRepository):
             if match is not None:
                 try:
                     number = match.group(1) or 0
-                    number = int(number)
+                    number = float(number)
                 except ValueError:
                     number = 0
             else:
@@ -144,6 +144,6 @@ class MangaParkChapter(Chapter):
 
 if __name__ == '__main__':
     repository = MangaParkRepository()
-    manga = repository.search("naruto")
+    manga = repository.search("bleach")
     firstChapter = manga.chapters[0]
-    firstChapter.pages()
+    print(firstChapter.pages())
