@@ -6,6 +6,11 @@ from tqdm import tqdm
 from PIL import Image
 from urllib.parse import urlparse
 from mangapy.mangarepository import Chapter
+from mangapy.fanfox import FanFoxRepository
+
+from concurrent.futures import ThreadPoolExecutor
+import threading
+import requests
 
 
 class MangaException(Exception):
@@ -74,3 +79,5 @@ class ChapterDownloader(object):
                 tasks.append(self.save(session, url, to, str(page.number)))
 
             await asyncio.gather(*tasks)
+
+

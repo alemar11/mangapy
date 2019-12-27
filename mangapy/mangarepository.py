@@ -30,7 +30,10 @@ class Chapter(ABC):
         pass
 
 
-Page = namedtuple("Page", "number url")
+class Page():
+    def __init__(self, number: int, url: str):
+        self.number = number
+        self.url = url
 
 
 class MangaRepository(ABC):

@@ -22,6 +22,10 @@ pytest = "*"
 tqdm = "*"
 uvloop = "*"
 pyexecjs = "*"
+lxml = "*"
+cssselect = "*"
+fake-useragent = "*"
+scrapy-fake-useragent = "*"
 
 [requires]
 python_version = "3.7"
