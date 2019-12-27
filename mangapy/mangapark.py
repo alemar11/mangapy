@@ -115,7 +115,7 @@ class MangaParkRepository(MangaRepository):
             chapter = MangaParkChapter(chapter_url, abs(number))
             manga_chapters[number] = chapter
 
-        sorted_chapters = sorted(manga_chapters.values(), key=lambda x: x.number, reverse=False)    
+        sorted_chapters = sorted(manga_chapters.values(), key=lambda chapter: chapter.number, reverse=False)    
         return sorted_chapters
 
 

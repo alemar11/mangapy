@@ -66,7 +66,8 @@ class FanFoxRepository(MangaRepository):
             chapter = FanFoxChapter(absolute_url, number, self.session)
             manga_chapters.append(chapter)
         
-        manga = Manga(manga_name, manga_chapters)
+        sorted_chapters = sorted(manga_chapters, key=lambda chapter: chapter.number, reverse=False)   
+        manga = Manga(manga_name, sorted_chapters)
         return manga
 
 
