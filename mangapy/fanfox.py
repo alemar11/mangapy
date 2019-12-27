@@ -62,7 +62,7 @@ class FanFoxRepository(MangaRepository):
         for url in chapters_url:
             number = url.split("/")[-2][1:]  # relative url, todo: regex
             absolute_url = "{0}{1}".format(self.base_url, url)
-            number = int(float(number)) #TODO: use float instead of int, ie Bleach ch 25
+            number = float(number)
             chapter = FanFoxChapter(absolute_url, number, self.session)
             manga_chapters.append(chapter)
         

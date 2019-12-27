@@ -27,7 +27,7 @@ class Page():
 
 
 class Chapter(ABC):
-    def __init__(self, first_page_url: str, number: int):
+    def __init__(self, first_page_url: str, number: float):
         self.first_page_url = first_page_url
         self.number = number
 

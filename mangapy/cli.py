@@ -101,5 +101,5 @@ if __name__ == '__main__':
     sys.argv.insert(1, "bleach")
     sys.argv.insert(2, "-d ~/Downloads/mangapy")
     #sys.argv.insert(2, "-c 11")
-    sys.argv.insert(2, "-c 11-32")
+    sys.argv.insert(2, "-c 25-57")
     main()
