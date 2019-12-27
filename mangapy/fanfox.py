@@ -33,7 +33,7 @@ class FanFoxRepository(MangaRepository):
             'Accept-Language': 'ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3',
             'Referer': 'http://fanfox.net',
             'Connection': 'keep-alive'
-            }
+        }
 
         self._session.cookies['isAdult'] = '1'
         self._session.headers = headers
@@ -121,7 +121,7 @@ class FanFoxChapter(Chapter):
         page_numbers = soup.findAll("a", {"data-page": True})
         page_numbers = map(lambda x: int(x['data-page']), page_numbers)
         last_page_number = max(page_numbers)
-        
+
         links = []
         for i in range(0, int(last_page_number / 2 + .5)):
             data = self._one_link_helper(soup.text, (i * 2) + 1, base_url)

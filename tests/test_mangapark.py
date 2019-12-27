@@ -1,6 +1,4 @@
 import context
-import asyncio
-
 from mangapy.mangapark import MangaParkRepository
 
 
@@ -17,7 +15,7 @@ def test_parse_manga():
     assert len(manga.chapters) == 701, "It should contain 701 chapters"
     firstChapter = manga.chapters[0]
     assert firstChapter is not None
-    pages = asyncio.run(firstChapter.pages())
+    pages = firstChapter.pages()
     first_chapter_count = 0
     for page in pages:
         first_chapter_count += 1
@@ -27,7 +25,7 @@ def test_parse_manga():
 
     lastChapter = manga.chapters[-1]
     assert lastChapter is not None
-    pages = asyncio.run(lastChapter.pages())
+    pages = lastChapter.pages()
     last_chapter_count = 0
     for page in pages:
         last_chapter_count += 1
@@ -43,7 +41,7 @@ def test_parse_mangapark_adult_content():
     assert len(manga.chapters) == 7, "It should contain 7 chapters"
     firstChapter = manga.chapters[0]
     assert firstChapter
-    pages = asyncio.run(firstChapter.pages())
+    pages = firstChapter.pages()
     for page in pages:
         assert page.number is not None
         assert page.url is not None
@@ -56,7 +54,7 @@ def test_parse_mangapark_adult_content_with_single_volume():
     assert len(manga.chapters) == 1, "It should contain only 1 chapter"
     firstChapter = manga.chapters[0]
     assert firstChapter is not None
-    pages = asyncio.run(firstChapter.pages())
+    pages = firstChapter.pages()
     for page in pages:
         assert page.number is not None
         assert page.url is not None
