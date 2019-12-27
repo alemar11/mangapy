@@ -31,3 +31,5 @@ TODO:
 - https://stackoverflow.com/questions/14058453/making-python-loggers-output-all-messages-to-stdout-in-addition-to-log-file
 - store all the images inside a MangaName/images directory so that we can have a MangaName/pdf directory
 - config file
+- hide some files from vscode
+- test download chapter with decimal is bleach 25.2
