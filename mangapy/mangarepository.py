@@ -20,25 +20,25 @@ class Manga(ABC):
         return re.sub(r'[^A-Za-z0-9]+', '_', re.sub(r'^[^A-Za-z0-9]+|[^A-Za-z0-9]+$', '', self.title)).lower()
 
 
-class Chapter(ABC):
-    def __init__(self, first_page_url: str, number: int):
-        self.first_page_url = first_page_url
-        self.number = number
-
-    @abstractmethod
-    def pages(self):
-        pass
-
-
 class Page():
     def __init__(self, number: int, url: str):
         self.number = number
         self.url = url
 
 
+class Chapter(ABC):
+    def __init__(self, first_page_url: str, number: int):
+        self.first_page_url = first_page_url
+        self.number = number
+
+    @abstractmethod
+    def pages(self) -> [Page]:
+        pass
+
+
 class MangaRepository(ABC):
     base_url = None
 
     @abstractmethod
-    def search(self, title):
+    def search(self, title) -> [Manga]:
         pass

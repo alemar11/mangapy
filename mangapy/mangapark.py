@@ -3,7 +3,8 @@ import json
 import re
 from mangapy.mangarepository import MangaRepository, Manga, Chapter, Page
 from bs4 import BeautifulSoup
-
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 class MangaParkRepository(MangaRepository):
     name = "MangaPark"
@@ -28,7 +29,7 @@ class MangaParkRepository(MangaRepository):
         self._session.headers = headers
         return self._session
 
-    def search(self, title):
+    def search(self, title) -> [Manga]:
         manga_name_adjusted = re.sub(r'[^A-Za-z0-9]+', '-', re.sub(r'^[^A-Za-z0-9]+|[^A-Za-z0-9]+$', '', title)).lower()
         manga_url = "{0}/manga/{1}".format(self.base_url, manga_name_adjusted)
         response = self.session.get(url=manga_url, verify=False)
@@ -119,7 +120,7 @@ class MangaParkRepository(MangaRepository):
 
 
 class MangaParkChapter(Chapter):
-    def pages(self):
+    def pages(self) -> [Page]:
         response = requests.get(url=self.first_page_url, verify=False)
         pages = []
 

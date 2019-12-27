@@ -13,7 +13,7 @@ from threading import Thread, Semaphore
 version = pkg_resources.require("mangapy")[0].version
 
 
-def cmdparse():
+def cmd_parse():
     """Returns parsed arguments from command line"""
     parser = argparse.ArgumentParser()
     parser.add_argument('title', type=str, help="manga title to download")
@@ -44,7 +44,7 @@ def cmdparse():
 
 
 def main():
-    args = cmdparse()
+    args = cmd_parse()
     title = args.title.strip()
     directory = args.dir.strip()
 

@@ -1,7 +1,7 @@
 {
     //"python.pythonPath": "/usr/local/bin/python3",
-    "python.pythonPath": "/Users/amarzoli/.local/share/virtualenvs/manga-S-NqUtI-/bin/python",
-    //"python.pythonPath": "/Users/alessandro/.local/share/virtualenvs/manga-dqWaS-Vy",
+    //"python.pythonPath": "/Users/amarzoli/.local/share/virtualenvs/manga-S-NqUtI-/bin/python",
+    "python.pythonPath": "/Users/alessandro/.local/share/virtualenvs/manga-dqWaS-Vy",
     "python.linting.enabled": true,
     //"python.linting.pylintPath": "~/Library/Python/3.7/bin/pylint",
     "python.linting.pylintEnabled": false,
