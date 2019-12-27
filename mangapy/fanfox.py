@@ -80,7 +80,7 @@ class FanFoxChapter(Chapter):
     def _get_urls(self, content):
         js = re.search(r'eval\((function\b.+)\((\'[\w ].+)\)\)', content).group(0)
         encrypted = js.split('}(')[1][:-1]
-        unpacked = eval('unpack(' + encrypted) 
+        unpacked = eval('unpack(' + encrypted)
         return unpacked
 
     def _get_key(self, content):
