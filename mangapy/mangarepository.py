@@ -21,7 +21,7 @@ class Manga(ABC):
 
 
 class Chapter(ABC):
-    def __init__(self, first_page_url, number):
+    def __init__(self, first_page_url: str, number: int):
         self.first_page_url = first_page_url
         self.number = number
 

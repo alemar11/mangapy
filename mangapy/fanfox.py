@@ -2,7 +2,8 @@ import re
 import requests
 from mangapy.mangarepository import MangaRepository, Manga, Chapter, Page
 from bs4 import BeautifulSoup
-
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 def unpack(p, a, c, k, e=None, d=None):
     def baseN(num, b, numerals="0123456789abcdefghijklmnopqrstuvwxyz"):
@@ -62,6 +63,7 @@ class FanFoxRepository(MangaRepository):
         for url in chapters_url:
             number = url.split("/")[-2][1:]  # relative url, todo: regex
             absolute_url = "{0}{1}".format(self.base_url, url)
+            number = int(float(number))
             chapter = FanFoxChapter(absolute_url, number, self.session)
             manga_chapters.append(chapter)
         

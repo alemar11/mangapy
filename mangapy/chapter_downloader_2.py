@@ -9,7 +9,6 @@ from mangapy.mangarepository import Chapter, Page
 from mangapy.fanfox import FanFoxRepository
 from concurrent.futures import ThreadPoolExecutor
 
-
 class ChapterDownloader2(object):    
     session = requests.Session()
 
@@ -18,7 +17,7 @@ class ChapterDownloader2(object):
         self.path = path
 
     def _fetch(self, url: str):
-        response = self.session.get(url)
+        response = self.session.get(url, verify=False)
         if response.status_code != 200:
             return None
         return response.content
@@ -52,9 +51,9 @@ class ChapterDownloader2(object):
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             list(tqdm(executor.map(func, pages), total=len(pages), desc=description, unit='pages', ncols=100))
 
-
-repo = FanFoxRepository()
-manga = repo.search('naruto')
-second_ch = manga.chapters[3]
-d = ChapterDownloader2('~/Downloads/_mangapy11')
-d.download(second_ch)            
+if __name__ == '__main__':
+    repo = FanFoxRepository()
+    manga = repo.search('naruto')
+    second_ch = manga.chapters[3]
+    d = ChapterDownloader2('~/Downloads/_mangapy11')
+    d.download(second_ch)            

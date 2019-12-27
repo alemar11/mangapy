@@ -5,11 +5,11 @@ import os
 
 from mangapy.mangarepository import Chapter
 from mangapy.mangapark import MangaParkRepository
-from mangapy.chapter_downloader import ChapterDownloader
+from mangapy.fanfox import FanFoxRepository
+from mangapy.chapter_downloader_2 import ChapterDownloader2
 from threading import Thread, Semaphore
 
 
-semaphore = Semaphore(3)
 version = pkg_resources.require("mangapy")[0].version
 
 
@@ -48,7 +48,8 @@ def main():
     title = args.title.strip()
     directory = args.dir.strip()
 
-    repository = MangaParkRepository()
+    #repository = MangaParkRepository()
+    repository = FanFoxRepository()
     manga = repository.search(title)
     directory = os.path.join(directory, 'mangapark', manga.subdirectory)
     chapters = []
@@ -87,16 +88,12 @@ def main():
         last_chapter = manga.chapters[-1]
         chapters.append(last_chapter)
 
-    threads = [Thread(target=schedule, args=(chapter, directory)) for chapter in chapters]
-    [thread.start() for thread in threads]
-    [thread.join() for thread in threads]
+    [schedule(chapter, directory) for chapter in chapters]
 
 
 def schedule(chapter: Chapter, directory: str):
-    semaphore.acquire()
-    cd = ChapterDownloader()
-    cd.start(chapter=chapter, to=directory)
-    semaphore.release()
+    cd = ChapterDownloader2(directory, max_workers=1) #it should be one for fanfox
+    cd.download(chapter=chapter)
 
 
 if __name__ == '__main__':
@@ -104,5 +101,5 @@ if __name__ == '__main__':
     sys.argv.insert(1, "bleach")
     sys.argv.insert(2, "-d ~/Downloads/mangapy")
     #sys.argv.insert(2, "-c 11")
-    sys.argv.insert(2, "-c 11-12")
+    sys.argv.insert(2, "-c 11-32")
     main()
