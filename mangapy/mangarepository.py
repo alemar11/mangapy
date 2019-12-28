@@ -15,7 +15,7 @@ class Manga(ABC):
 
     @property
     def subdirectory(self):
-        # subdirectory where chapter should be saved
+        # subdirectory where chapters should be saved
         return re.sub(r'[^A-Za-z0-9]+', '_', re.sub(r'^[^A-Za-z0-9]+|[^A-Za-z0-9]+$', '', self.title)).lower()
 
 

@@ -57,8 +57,8 @@ class ChapterArchiver(object):
         output.close()
 
     def _create_chapter_pdf(self, chapter_images_path: Path, pdf_path: Path):
-        _list = list(chapter_images_path.glob('**/*.jpg'))
-        chapter_images_path = list(map(lambda path: str(path.absolute()), _list))
+        file_list = list(chapter_images_path.glob('**/*')) # we don't care of their ext
+        chapter_images_path = list(map(lambda path: str(path.absolute()), file_list))
         images_path = natural_sort(chapter_images_path)
 
         images = []
@@ -68,8 +68,15 @@ class ChapterArchiver(object):
                 image = image.convert('RGB')
             images.append(image)
 
-        first_image = images.pop(0)
-        first_image.save(pdf_path, "PDF", resolution=100.0, save_all=True, append_images=images)
+        images_count = len(images)
+        if images_count <= 0:
+            return
+        elif images_count == 1:
+            first_image = images.pop(0)
+            first_image.save(pdf_path, "PDF", resolution=100.0, save_all=True)
+        else:    
+            first_image = images.pop(0)
+            first_image.save(pdf_path, "PDF", resolution=100.0, save_all=True, append_images=images)
 
 
 def natural_sort(list):
