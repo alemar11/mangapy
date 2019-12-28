@@ -9,6 +9,10 @@
     "python.linting.flake8Args": [
         "--max-line-length=120",
     ],
+    "files.exclude": {
+        "**/__pycache__": true,
+        "**/*.egg-info": true
+    }
 }
 
 // To configure pythonPath when using pipenv
