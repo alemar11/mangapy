@@ -9,23 +9,14 @@ pylint = "*"
 v = {editable = true,version = "*"}
 pytest = "*"
 rope = "*"
-pyexecjs = "*"
 
 [packages]
 bs4 = "*"
 requests = "*"
 mangapy = {editable = true,path = "."}
-asyncio = "*"
-aiohttp = "*"
 pillow = "*"
 pytest = "*"
 tqdm = "*"
-uvloop = "*"
-pyexecjs = "*"
-lxml = "*"
-cssselect = "*"
-fake-useragent = "*"
-scrapy-fake-useragent = "*"
 
 [requires]
 python_version = "3.7"
