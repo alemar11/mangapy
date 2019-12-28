@@ -2,12 +2,9 @@ import sys
 import pkg_resources
 import argparse
 import os
-
-from mangapy.mangarepository import Chapter
 from mangapy.mangapark import MangaParkRepository
 from mangapy.fanfox import FanFoxRepository
 from mangapy.chapter_archiver import ChapterArchiver
-from threading import Thread, Semaphore
 
 
 version = pkg_resources.require("mangapy")[0].version
@@ -17,6 +14,7 @@ def cmd_parse():
     """Returns parsed arguments from command line"""
     parser = argparse.ArgumentParser()
     parser.add_argument('title', type=str, help="manga title to download")
+    parser.add_argument('-s', '--source', type=str, help="manga source")
     group = parser.add_mutually_exclusive_group()
     group.add_argument('-a', '--all', action='store_true', help="download all chapters available")
     group.add_argument('-c', '--chapter', type=str, help="chapter(s) number to download")
@@ -46,19 +44,32 @@ def cmd_parse():
 def main():
     args = cmd_parse()
     title = args.title.strip()
-    directory = args.dir.strip()
+    directory = args.dir.strip() or '~/Downloads/mangapy'
+    
+    source = args.source.strip().lower()
+    if source == 'fanfox':
+        repository = FanFoxRepository()
+        repository_directory = source
+        max_workers = 1  # to avoid bot detection
+    elif source == 'mangapark':
+        repository = MangaParkRepository()
+        repository_directory = source
+        max_workers = 5
+    else:
+        repository = FanFoxRepository()
+        repository_directory = 'fanfox'
+        max_workers = 1 # to avoid bot detection
 
-    #repository = MangaParkRepository()
-    repository = FanFoxRepository()
     manga = repository.search(title)
-    directory = os.path.join(directory, 'mangapark', manga.subdirectory)
+    directory = os.path.join(directory, repository_directory, manga.subdirectory)
     chapters = []
 
     if manga is None or len(manga.chapters) <= 0:
         return
-
+  
     if args.all:
         chapters = manga.chapters
+
     elif args.chapter:
         try:
             chapter_number = int(args.chapter.strip())
@@ -81,14 +92,13 @@ def main():
             if args.end and chapter.number == args.end:
                 stop = index + 1
         for chapter in manga.chapters[start:stop]:
-            # TODO: test
             chapters.append(chapter)
 
     else:
         last_chapter = manga.last_chapter
         chapters.append(last_chapter)
 
-    archiver = ChapterArchiver(directory, max_workers=1) #it should be one for fanfox
+    archiver = ChapterArchiver(directory, max_workers=max_workers)
     [archiver.archive(chapter=chapter) for chapter in chapters]
 
 
@@ -97,6 +107,7 @@ if __name__ == '__main__':
     sys.argv.insert(1, "bleach")
     sys.argv.insert(2, "-d ~/Downloads/mangapy")
     #sys.argv.insert(2, "-c 0")
-    sys.argv.insert(2, "-c 0-1")
+    sys.argv.insert(3, "-c 0-1")
+    sys.argv.insert(4, "-s mangapark")
     #sys.argv.insert(2, "-c 25-27")
     main()
