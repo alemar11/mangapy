@@ -30,4 +30,5 @@ TODO:
 - logging
 - https://stackoverflow.com/questions/14058453/making-python-loggers-output-all-messages-to-stdout-in-addition-to-log-file
 - config file
+- add sugges again
 
