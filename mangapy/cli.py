@@ -15,10 +15,10 @@ def cmd_parse():
     parser = argparse.ArgumentParser()
     parser.add_argument('title', type=str, help="manga title to download")
     parser.add_argument('-s', '--source', type=str, help="manga source")
+    parser.add_argument('-d', '--dir', type=str, default='.', help='download directory', required=True)
     group = parser.add_mutually_exclusive_group()
     group.add_argument('-a', '--all', action='store_true', help="download all chapters available")
     group.add_argument('-c', '--chapter', type=str, help="chapter(s) number to download")
-    parser.add_argument('-d', '--dir', type=str, default='.', help='download directory')
     parser.add_argument('-v', '--version',
                         action='version',
                         version='{0} {1}'.format(parser.prog, version),
@@ -44,21 +44,25 @@ def cmd_parse():
 def main():
     args = cmd_parse()
     title = args.title.strip()
-    directory = args.dir.strip() or '~/Downloads/mangapy'
-    
-    source = args.source.strip().lower()
-    if source == 'fanfox':
-        repository = FanFoxRepository()
-        repository_directory = source
-        max_workers = 1  # to avoid bot detection
-    elif source == 'mangapark':
-        repository = MangaParkRepository()
-        repository_directory = source
-        max_workers = 5
-    else:
+    directory = args.dir.strip()
+    source = args.source
+
+    if source is None:
         repository = FanFoxRepository()
         repository_directory = 'fanfox'
         max_workers = 1 # to avoid bot detection
+    else:
+        source = source.strip().lower()
+        if source == 'fanfox':
+            repository = FanFoxRepository()
+            repository_directory = source
+            max_workers = 1  # to avoid bot detection
+        elif source == 'mangapark':
+            repository = MangaParkRepository()
+            repository_directory = source
+            max_workers = 5
+        else:
+            sys.exit('source is missing')
 
     manga = repository.search(title)
     directory = os.path.join(directory, repository_directory, manga.subdirectory)
@@ -83,7 +87,7 @@ def main():
         else:
             sys.exit("Chapter doesn't exist.")
 
-    elif args.begin >= 0:
+    elif args.begin is not None and args.begin >= 0:
         start = None
         stop = None
         for index, chapter in enumerate(manga.chapters):
