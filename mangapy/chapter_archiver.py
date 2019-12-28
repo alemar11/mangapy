@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 from mangapy.mangarepository import Chapter, Page
 from mangapy.fanfox import FanFoxRepository
 from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path, PosixPath
+from pathlib import Path
 
 
 class ChapterArchiver(object):
@@ -79,12 +79,4 @@ def natural_sort(list):
     def alphanum_key(key):
         return [convert(c) for c in re.split('([0-9]+)', key)]
 
-    return sorted(list, key=alphanum_key)
-
-
-if __name__ == '__main__':
-    repo = FanFoxRepository()
-    manga = repo.search('naruto')
-    second_ch = manga.chapters[3]
-    d = ChapterArchiver('~/Downloads/_mangapy11/naruto')
-    d.archive(second_ch)            
+    return sorted(list, key=alphanum_key)           

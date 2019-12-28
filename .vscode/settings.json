@@ -7,7 +7,7 @@
     "python.linting.pylintEnabled": false,
     "python.linting.flake8Enabled": true,
     "python.linting.flake8Args": [
-        "--max-line-length=120",
+        "--max-line-length=130",
     ],
     "files.exclude": {
         "**/__pycache__": true,

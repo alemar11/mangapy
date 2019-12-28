@@ -141,9 +141,3 @@ class MangaParkChapter(Chapter):
                     url = 'https:' + page['u']
                 pages.append(Page(page['n'], url))
         return pages
-
-if __name__ == '__main__':
-    repository = MangaParkRepository()
-    manga = repository.search("bleach")
-    firstChapter = manga.chapters[0]
-    print(firstChapter.pages())

@@ -134,21 +134,3 @@ class FanFoxChapter(Chapter):
             pages.append(Page(i, link))
 
         return pages
-
-
-if __name__ == '__main__':
-    repository = FanFoxRepository()
-    manga = repository.search("kimetsu no yaiba")
-    firstChapter = manga.chapters[0]
-    firstChapter.pages()
-
-
-#repository.search("kimetsu no yaiba")
-# test: Kimetsu no Yaiba: Tomioka Giyuu Gaiden
-
-#repository.search('Kimetsu no Yaiba: Tomioka Giyuu Gaiden')
-
-
-#repository.suggest("kimetsu")
-#repository.search('Free! dj - Kekkon Shitara Dou Naru!?') # adult content
-#http://fanfox.net/manga/gentleman_devil/v01/c038/1.html # adult content
