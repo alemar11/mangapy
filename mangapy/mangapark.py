@@ -6,6 +6,7 @@ from bs4 import BeautifulSoup
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
+
 class MangaParkRepository(MangaRepository):
     name = "MangaPark"
     base_url = "https://mangapark.net"
@@ -115,7 +116,7 @@ class MangaParkRepository(MangaRepository):
             chapter = MangaParkChapter(chapter_url, abs(number))
             manga_chapters[number] = chapter
 
-        sorted_chapters = sorted(manga_chapters.values(), key=lambda chapter: chapter.number, reverse=False)    
+        sorted_chapters = sorted(manga_chapters.values(), key=lambda chapter: chapter.number, reverse=False)
         return sorted_chapters
 
 

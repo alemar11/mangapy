@@ -32,5 +32,3 @@ setup(
     mangapy = mangapy.cli:main
     """
 )
-
-# http://doc.pytest.org/en/latest/goodpractices.html
