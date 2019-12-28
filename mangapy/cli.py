@@ -6,7 +6,7 @@ import os
 from mangapy.mangarepository import Chapter
 from mangapy.mangapark import MangaParkRepository
 from mangapy.fanfox import FanFoxRepository
-from mangapy.chapter_downloader_2 import ChapterDownloader2
+from mangapy.chapter_archiver import ChapterArchiver
 from threading import Thread, Semaphore
 
 
@@ -72,7 +72,7 @@ def main():
         else:
             sys.exit("Chapter doesn't exist.")
 
-    elif args.begin:
+    elif args.begin >= 0:
         start = None
         stop = None
         for index, chapter in enumerate(manga.chapters):
@@ -85,21 +85,18 @@ def main():
             chapters.append(chapter)
 
     else:
-        last_chapter = manga.chapters[-1]
+        last_chapter = manga.last_chapter
         chapters.append(last_chapter)
 
-    [schedule(chapter, directory) for chapter in chapters]
-
-
-def schedule(chapter: Chapter, directory: str):
-    cd = ChapterDownloader2(directory, max_workers=1) #it should be one for fanfox
-    cd.download(chapter=chapter)
+    archiver = ChapterArchiver(directory, max_workers=1) #it should be one for fanfox
+    [archiver.archive(chapter=chapter) for chapter in chapters]
 
 
 if __name__ == '__main__':
     #sys.argv.insert(1, "Naruto - Eroi no Vol.1 (Doujinshi)")
     sys.argv.insert(1, "bleach")
     sys.argv.insert(2, "-d ~/Downloads/mangapy")
-    #sys.argv.insert(2, "-c 11")
-    sys.argv.insert(2, "-c 25-57")
+    #sys.argv.insert(2, "-c 0")
+    sys.argv.insert(2, "-c 0-1")
+    #sys.argv.insert(2, "-c 25-27")
     main()

@@ -10,7 +10,7 @@ class Manga(ABC):
         self.chapters = chapters
 
     @property
-    def latest(self):
+    def last_chapter(self):
         # latest chapter available
         return self.chapters[-1]
 
