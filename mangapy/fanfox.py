@@ -31,7 +31,8 @@ class FanFoxRepository(MangaRepository):
         headers = {
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=1.0,image/webp,image/apng,*/*;q=1.0',
             'Accept-Encoding': 'gzip, deflate',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.101 Safari/537.36',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) '
+                          'Chrome/60.0.3112.101 Safari/537.36',
             'Accept-Language': 'ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3',
             'Referer': 'http://fanfox.net',
             'Connection': 'keep-alive'
@@ -151,7 +152,8 @@ class FanFoxChapter(Chapter):
 
         return pages
 
+
 if __name__ == '__main__':
     repo = FanFoxRepository()
     manga = repo.search('naruto')
-    print(manga)
+    assert manga is not None

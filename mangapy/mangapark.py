@@ -24,12 +24,14 @@ class MangaParkRepository(MangaRepository):
         headers = {
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=1.0,image/webp,image/apng,*/*;q=1.0',
             'Accept-Encoding': 'gzip, deflate',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.101 Safari/537.36',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) '
+                          'Chrome/60.0.3112.101 Safari/537.36',
             'Accept-Language': 'ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3',
             'Referer': 'https://mangapark.net/',
             'Connection': 'keep-alive'
         }
-        self._session.cookies['set'] = 'theme=1&h=1&img_load=5&img_zoom=1&img_tool=1&twin_m=0&twin_c=0&manga_a_warn=1&history=1&timezone=14'
+        self._session.cookies['set'] = 'theme=1&h=1&img_load=5&img_zoom=1&img_tool=1&twin_m=0' \
+                                       '&twin_c=0&manga_a_warn=1&history=1&timezone=14'
         self._session.headers = headers
         self._session.proxies = self.proxies
         return self._session
@@ -97,7 +99,9 @@ class MangaParkRepository(MangaRepository):
 
         for metadata in chapters_metadata:
             # https://regex101.com/r/PFFb5l/10
-            match = re.search(r'((?<=ch.)([0-9]*)|(?<=Chapter)\s*-?([0-9]*[.]?[0-9])|(?<=Page)\s*-?([0-9]*[.]?[0-9]))', metadata.title)
+            match = re.search(
+                r'((?<=ch.)([0-9]*)|(?<=Chapter)\s*-?([0-9]*[.]?[0-9])|(?<=Page)\s*-?([0-9]*[.]?[0-9]))',
+                metadata.title)
             if match is not None:
                 try:
                     number = match.group(1) or 0
