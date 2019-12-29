@@ -39,8 +39,8 @@ class MangaParkRepository(MangaRepository):
         if response is None or response.status_code != 200:
             return None
 
-        body = response.text
-        soup = BeautifulSoup(body, "html.parser")
+        text = response.text
+        soup = BeautifulSoup(text, "html.parser")
 
         # 1 fox
         # 3 panda
@@ -60,6 +60,7 @@ class MangaParkRepository(MangaRepository):
                     log.warning('content not found for stream {0}'.format(stream))
 
         if len(contents) == 0:
+            log.warning('No chapters found')
             return None
 
         last_chapter_number = -1
