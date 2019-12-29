@@ -52,6 +52,10 @@ class FanFoxRepository(MangaRepository):
         soup = BeautifulSoup(content, features="html.parser")
         # list-2 contains all the chapters, list-1 only the last volume
         all_chapters = soup.find('div', {'id': 'list-2'})
+
+        if all_chapters is None:
+            return None
+
         chapters_detail = all_chapters.find('ul', {'class': 'detail-main-list'})
         
         if chapters_detail is None:
