@@ -7,7 +7,9 @@ Manga downloader supporting the following sources:
 
 ## Installation
 
-'pip install mangapy'
+```
+pip install mangapy
+```
 
 ## Usage
 
