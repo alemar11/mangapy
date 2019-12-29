@@ -10,7 +10,7 @@ setup(
     author_email="alessandromarzoli@gmail.com",
     name='mangapy',
     license="MIT",
-    description='manga downloader',
+    description='Manga downloader',
     version='1.0.0',
     long_description=README,
     url='https://github.com/alemar11/manga',
