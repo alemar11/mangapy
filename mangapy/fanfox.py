@@ -44,7 +44,7 @@ class FanFoxRepository(MangaRepository):
         manga_name_adjusted = re.sub(r'[^A-Za-z0-9]+', '_', re.sub(r'^[^A-Za-z0-9]+|[^A-Za-z0-9]+$', '', manga_name)).lower()
         manga_url = "{0}/manga/{1}".format(self.base_url, manga_name_adjusted)
         response = self.session.get(url=manga_url)
-        print(response)    
+
         if response is None or response.status_code != 200:
             return None
 
@@ -54,11 +54,13 @@ class FanFoxRepository(MangaRepository):
         all_chapters = soup.find('div', {'id': 'list-2'})
 
         if all_chapters is None:
+            print('no chapters')
             return None
 
         chapters_detail = all_chapters.find('ul', {'class': 'detail-main-list'})
 
         if chapters_detail is None:
+            print('no chapters detail')
             return None
 
         chapters = chapters_detail.findAll('a', href=True)
