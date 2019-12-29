@@ -8,10 +8,10 @@ def test_fetch_not_existing_manga():
     assert manga is None
 
 
-# def test_fetch_manga():
-#     repository = FanFoxRepository()
-#     manga = repository.search('naruto')
-#     assert manga is not None
+def test_fetch_manga():
+    repository = FanFoxRepository()
+    manga = repository.search('naruto')
+    assert manga is not None
 #     assert len(manga.chapters) == 750, "It should contain 750 chapters"
 #     firstChapter = manga.chapters[0]
 #     assert firstChapter is not None
