@@ -1,4 +1,4 @@
-import mangapy
+import mangapy  # noqa: F401
 import os
 import sys
 
