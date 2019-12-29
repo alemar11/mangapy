@@ -16,7 +16,7 @@ setup(
     url='https://github.com/alemar11/manga',
     packages=find_packages(),
     python_requires=">=3.7",
-    install_requires=['pillow', 'tqdm'],
+    install_requires=['pillow', 'requests', 'tqdm'],
     classifiers=[
         # (https://pypi.python.org/pypi?%3Aaction=list_classifiers)
         'Development Status :: 5 - Production/Stable',
