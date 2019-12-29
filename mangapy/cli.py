@@ -70,7 +70,7 @@ def main():
         else:
             sys.exit('source is missing')
 
-    print('Searching...')
+    print('Searching {0}...'.format(title))
     manga = repository.search(title)
     if manga is None or len(manga.chapters) <= 0:
         sys.exit('Manga {0} doesn\'t exist.'.format(title))
