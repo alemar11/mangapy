@@ -27,7 +27,7 @@ class FanFoxRepository(MangaRepository):
 
         self._session = requests.Session()
         headers = {
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=1.0,image/webp,image/apng,*/*;q=1.0', 
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=1.0,image/webp,image/apng,*/*;q=1.0',
             'Accept-Encoding': 'gzip, deflate',
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.101 Safari/537.36',
             'Accept-Language': 'ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3',
@@ -57,22 +57,22 @@ class FanFoxRepository(MangaRepository):
             return None
 
         chapters_detail = all_chapters.find('ul', {'class': 'detail-main-list'})
-        
+
         if chapters_detail is None:
             return None
-        
+
         chapters = chapters_detail.findAll('a', href=True)
         chapters_url = map(lambda c: c['href'], reversed(chapters))
         manga_chapters = []
-        
+
         for url in chapters_url:
             number = url.split("/")[-2][1:]  # relative url, todo: regex
             absolute_url = "{0}{1}".format(self.base_url, url)
             number = float(number)
             chapter = FanFoxChapter(absolute_url, number, self.session)
             manga_chapters.append(chapter)
-        
-        sorted_chapters = sorted(manga_chapters, key=lambda chapter: chapter.number, reverse=False)   
+
+        sorted_chapters = sorted(manga_chapters, key=lambda chapter: chapter.number, reverse=False)
         manga = Manga(manga_name, sorted_chapters)
         return manga
 
