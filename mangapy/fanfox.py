@@ -1,6 +1,6 @@
-import log
 import re
 import requests
+from mangapy import log
 from mangapy.mangarepository import MangaRepository, Manga, Chapter, Page
 from bs4 import BeautifulSoup
 
