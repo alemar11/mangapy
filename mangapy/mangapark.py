@@ -33,7 +33,7 @@ class MangaParkRepository(MangaRepository):
         self._session.headers = headers
         if self.enable_proxy:
             # https://hidemy.name/en/proxy-list/?type=hs#list
-            self._session.proxies = {'http': '5.189.133.231', 'https': '5.189.133.231'}
+            self._session.proxies = {'http': '5.135.184.46:3128', 'https': '5.135.184.46:3128'}
         return self._session
 
     def search(self, title) -> [Manga]:
