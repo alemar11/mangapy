@@ -78,7 +78,7 @@ def main():
     print('Manga found')
     directory = os.path.join(directory, repository_directory, manga.subdirectory)
     chapters = []
-  
+
     if args.all:
         chapters = manga.chapters
 
@@ -123,10 +123,10 @@ def main():
 
 if __name__ == '__main__':
     sys.argv.insert(1, 'bleach')
-    #sys.argv.insert(1, "Naruto - Eroi no Vol.1 (Doujinshi)")
+    # sys.argv.insert(1, "Naruto - Eroi no Vol.1 (Doujinshi)")
     sys.argv.insert(2, '-o ~/Downloads/mangapy')
-    #sys.argv.insert(2, "-c 0")
+    # sys.argv.insert(2, "-c 0")
     sys.argv.insert(3, '-c 0-1')
     sys.argv.insert(4, '-s mangapark')
-    #sys.argv.insert(5, '--debug')
+    # sys.argv.insert(5, '--debug')
     main()

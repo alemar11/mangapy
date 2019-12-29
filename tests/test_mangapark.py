@@ -1,4 +1,4 @@
-import context
+import context  # noqa: F401
 import pytest
 from mangapy.mangapark import MangaParkRepository
 

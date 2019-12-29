@@ -5,7 +5,6 @@ from tqdm import tqdm
 from PIL import Image
 from urllib.parse import urlparse
 from mangapy.mangarepository import Chapter, Page
-from mangapy.fanfox import FanFoxRepository
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -38,26 +37,26 @@ class ChapterArchiver(object):
         if response.status_code != 200:
             return None
         return response.content
-            
+
     def _save_image(self, image_path: Path, page: Page):
         file_name = str(page.number)
         image_url = page.url
         file_ext = urlparse(image_url).path.split('.')[-1]
         if image_url.startswith('//'):
             image_url = 'http:' + image_url
-        
+
         data = self._fetch_image(image_url)
 
         if data is None:
             return
-        
+
         file_path = image_path.joinpath(file_name + '.' + file_ext)
         output = open(file_path, "wb")
         output.write(data)
         output.close()
 
     def _create_chapter_pdf(self, chapter_images_path: Path, pdf_path: Path):
-        file_list = list(chapter_images_path.glob('**/*')) # we don't care of their ext
+        file_list = list(chapter_images_path.glob('**/*'))  # we don't care of their ext
         chapter_images_path = list(map(lambda path: str(path.absolute()), file_list))
         images_path = natural_sort(chapter_images_path)
 
@@ -86,4 +85,4 @@ def natural_sort(list):
     def alphanum_key(key):
         return [convert(c) for c in re.split('([0-9]+)', key)]
 
-    return sorted(list, key=alphanum_key)   
+    return sorted(list, key=alphanum_key)
