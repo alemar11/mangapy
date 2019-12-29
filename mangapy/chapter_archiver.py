@@ -74,7 +74,7 @@ class ChapterArchiver(object):
         elif images_count == 1:
             first_image = images.pop(0)
             first_image.save(pdf_path, "PDF", resolution=100.0, save_all=True)
-        else:    
+        else:
             first_image = images.pop(0)
             first_image.save(pdf_path, "PDF", resolution=100.0, save_all=True, append_images=images)
 
@@ -86,4 +86,4 @@ def natural_sort(list):
     def alphanum_key(key):
         return [convert(c) for c in re.split('([0-9]+)', key)]
 
-    return sorted(list, key=alphanum_key)           
+    return sorted(list, key=alphanum_key)   

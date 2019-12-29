@@ -1,9 +1,11 @@
 import requests
 import json
 import re
+import urllib3
+from mangapy import log
 from mangapy.mangarepository import MangaRepository, Manga, Chapter, Page
 from bs4 import BeautifulSoup
-import urllib3
+
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
@@ -48,15 +50,14 @@ class MangaParkRepository(MangaRepository):
         streams = ['stream_1', 'stream_3', 'stream_6', 'stream_4', 'stream_101']
         contents = {}
         for stream in streams:
-            print(stream)
             content = soup.find('div', {'id': stream})
             if content is not None:
                 list = self.parse_chapters(content)
                 if list is not None:
-                    print("     content found")
+                    log.info('content found for stream {0}'.format(stream))
                     contents[stream] = list
                 else:
-                    print("     content NOT found")   
+                    log.warning('content not found for stream {0}'.format(stream))
 
         if len(contents) == 0:
             return None
@@ -72,8 +73,7 @@ class MangaParkRepository(MangaRepository):
                 most_updated_stream = stream
 
         manga_chapters = contents[most_updated_stream]
-        print("Using: " + most_updated_stream + ' with last chapter: ' + str(last_chapter_number))
-        
+        log.info('using {0} (last chapter: {1})'.format(most_updated_stream, str(last_chapter_number)))
         manga = Manga(title, manga_chapters)
         return manga
 
@@ -108,7 +108,7 @@ class MangaParkRepository(MangaRepository):
                 # some streams uses ch 0 in different volumes to identify side stories
                 # i.e. Vol.23 Chapter 0: Side-A the sand
                 # those chapter will be skipped
-                print('❌ skipping:' + metadata.title)
+                log.warning('skipping chapter {0}'.format(metadata.title))
                 continue
 
             url = metadata.url
