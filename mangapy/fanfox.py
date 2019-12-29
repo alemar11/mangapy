@@ -21,7 +21,7 @@ class FanFoxRepository(MangaRepository):
     name = "FanFox"
     base_url = "http://fanfox.net"
     _session = None
-    enable_proxy = false
+    enable_proxy = False
 
     @property
     def session(self):
