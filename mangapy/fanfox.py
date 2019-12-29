@@ -51,8 +51,7 @@ class FanFoxRepository(MangaRepository):
 
         content = response.text
         soup = BeautifulSoup(content, features="html.parser")
-        print(soup)
-        print(soup.text)
+
         # list-2 contains all the chapters, list-1 only the last volume
         all_chapters = soup.find('div', {'id': 'list-2'})
 
