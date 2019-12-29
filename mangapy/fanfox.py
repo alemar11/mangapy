@@ -1,3 +1,4 @@
+import log
 import re
 import requests
 from mangapy.mangarepository import MangaRepository, Manga, Chapter, Page
@@ -54,13 +55,13 @@ class FanFoxRepository(MangaRepository):
         all_chapters = soup.find('div', {'id': 'list-2'})
 
         if all_chapters is None:
-            print('no chapters')
+            log.warning('No chapters found')
             return None
 
         chapters_detail = all_chapters.find('ul', {'class': 'detail-main-list'})
 
         if chapters_detail is None:
-            print('no chapters detail')
+            log.warning('No chapters list found')
             return None
 
         chapters = chapters_detail.findAll('a', href=True)
