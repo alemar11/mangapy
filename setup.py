@@ -1,31 +1,34 @@
-"""Setup for the manga package."""
+"""Setup for the mangapy package."""
 
-import setuptools
+from setuptools import setup, find_packages
 
 with open('README.md') as f:
     README = f.read()
 
-setuptools.setup(
+setup(
     author="Alessandro Marzoli",
     author_email="alessandromarzoli@gmail.com",
-    name='manga',
+    name='mangapy',
     license="MIT",
-    description='manga downloader',
-    version='v0.0.1',
+    description='Manga downloader',
+    version='1.0.0',
     long_description=README,
     url='https://github.com/alemar11/manga',
-    packages=setuptools.find_packages(),
-    python_requires=">=3.5",
-    install_requires=['requests'],
+    packages=find_packages(),
+    python_requires=">=3.7",
+    install_requires=['pillow', 'tqdm'],
     classifiers=[
         # (https://pypi.python.org/pypi?%3Aaction=list_classifiers)
         'Development Status :: 5 - Production/Stable',
         'License :: OSI Approved :: MIT License',
         'Programming Language :: Python',
-        'Programming Language :: Python :: 3.5',
-        'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
         'Topic :: Games/Entertainment',
         'Topic :: Software Development :: Libraries :: Python Modules',
         'Intended Audience :: End Users/Desktop',
     ],
+    entry_points="""
+    [console_scripts]
+    mangapy = mangapy.cli:main
+    """
 )

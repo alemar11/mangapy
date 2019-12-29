@@ -1,0 +1,22 @@
+[[source]]
+name = "pypi"
+url = "https://pypi.org/simple"
+verify_ssl = true
+
+[dev-packages]
+flake8 = "*"
+pylint = "*"
+v = {editable = true,version = "*"}
+pytest = "*"
+rope = "*"
+
+[packages]
+bs4 = "*"
+requests = "*"
+mangapy = {editable = true,path = "."}
+pillow = "*"
+pytest = "*"
+tqdm = "*"
+
+[requires]
+python_version = "3.7"
