@@ -50,7 +50,7 @@ class FanFoxRepository(MangaRepository):
             return None
 
         content = response.text
-
+        print(manga_url)
         print(content)
 
         soup = BeautifulSoup(content, features="html.parser")
