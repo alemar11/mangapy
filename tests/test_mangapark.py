@@ -1,13 +1,14 @@
 import context
+import pytest
 from mangapy.mangapark import MangaParkRepository
 
-
+@pytest.mark.filterwarnings('ignore::urllib3.exceptions.InsecureRequestWarning')
 def test_parse_not_existing_manga():
     repository = MangaParkRepository()
     manga = repository.search('this manga doesn\'t exists')
     assert manga is None
 
-
+@pytest.mark.filterwarnings('ignore::urllib3.exceptions.InsecureRequestWarning')
 def test_parse_manga():
     repository = MangaParkRepository()
     manga = repository.search('naruto')
@@ -33,7 +34,7 @@ def test_parse_manga():
         assert page.url is not None
     assert last_chapter_count == 18, "The last Naruto chapter sould contain 18 pages"
 
-
+@pytest.mark.filterwarnings('ignore::urllib3.exceptions.InsecureRequestWarning')
 def test_parse_mangapark_adult_content():
     repository = MangaParkRepository()
     manga = repository.search('emergence')
@@ -46,7 +47,7 @@ def test_parse_mangapark_adult_content():
         assert page.number is not None
         assert page.url is not None
 
-
+@pytest.mark.filterwarnings('ignore::urllib3.exceptions.InsecureRequestWarning')
 def test_parse_mangapark_adult_content_with_single_volume():
     repository = MangaParkRepository()
     manga = repository.search('Naruto - Eroi no Vol.1 (Doujinshi)')

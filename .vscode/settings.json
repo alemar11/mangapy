@@ -1,7 +1,6 @@
 {
-    //"python.pythonPath": "/usr/local/bin/python3",
     //"python.pythonPath": "/Users/amarzoli/.local/share/virtualenvs/manga-S-NqUtI-/bin/python",
-    "python.pythonPath": "/Users/alessandro/.local/share/virtualenvs/manga-dqWaS-Vy",
+    "python.pythonPath": "/Users/alessandro/.local/share/virtualenvs/manga-dqWaS-Vy/bin/python",
     "python.linting.enabled": true,
     //"python.linting.pylintPath": "~/Library/Python/3.7/bin/pylint",
     "python.linting.pylintEnabled": false,
@@ -15,9 +14,9 @@
     }
 }
 
-// To configure pythonPath when using pipenv
+// To configure pythonPath when using pipenv run
 // pipenv --py
-//
+// 
 // or
 //
 // pipenv --venv
