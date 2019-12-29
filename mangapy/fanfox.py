@@ -55,6 +55,8 @@ class FanFoxRepository(MangaRepository):
         # list-2 contains all the chapters, list-1 only the last volume
         all_chapters = soup.find('div', {'id': 'list-2'})
 
+        all_chapters = soup.find('div', {'id': 'list-1'})
+
         if all_chapters is None:
             log.warning('No chapters found')
             return None
