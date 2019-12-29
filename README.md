@@ -33,6 +33,17 @@ pipenv run pytest
 
 ## Usage
 
+Downloads all Bleach chatpers inside the *Downloads* folder (from Fanfox source).
 ```
-mangapy bleach -c 0-1 -o "~/Downloads"
+mangapy bleach -a -o ~/Downloads
+```
+
+Downloads Bleach chatper 1 inside the *Downloads* folder (from Fanfox source).
+```
+mangapy bleach -c 1 -o ~/Downloads
+```
+
+Downloads Bleach chatpers from 0 to 10 (included) inside the *Downloads* folder using MangaPark as source.
+```
+mangapy bleach -c 0-10 -o ~/Downloads -s mangapark
 ```
