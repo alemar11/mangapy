@@ -12,8 +12,8 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 class MangaParkRepository(MangaRepository):
     name = "MangaPark"
     base_url = "https://mangapark.net"
+    proxies = None
     _session = None
-    enable_proxy = False
 
     @property
     def session(self):
@@ -31,9 +31,7 @@ class MangaParkRepository(MangaRepository):
         }
         self._session.cookies['set'] = 'theme=1&h=1&img_load=5&img_zoom=1&img_tool=1&twin_m=0&twin_c=0&manga_a_warn=1&history=1&timezone=14'
         self._session.headers = headers
-        if self.enable_proxy:
-            # https://hidemy.name/en/proxy-list/?type=hs#list
-            self._session.proxies = {'http': '5.135.184.46:3128', 'https': '5.135.184.46:3128'}
+        self._session.proxies = self.proxies
         return self._session
 
     def search(self, title) -> [Manga]:

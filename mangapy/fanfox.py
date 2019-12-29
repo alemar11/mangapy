@@ -2,7 +2,6 @@ import re
 import requests
 from mangapy import log
 from mangapy.mangarepository import MangaRepository, Manga, Chapter, Page
-from mangapy.proxy import Proxy
 from bs4 import BeautifulSoup
 
 
@@ -20,8 +19,8 @@ def unpack(p, a, c, k, e=None, d=None):
 class FanFoxRepository(MangaRepository):
     name = "FanFox"
     base_url = "http://fanfox.net"
+    proxies = None
     _session = None
-    enable_proxy = False
 
     @property
     def session(self):
@@ -40,9 +39,7 @@ class FanFoxRepository(MangaRepository):
 
         self._session.cookies['isAdult'] = '1'
         self._session.headers = headers
-        if self.enable_proxy:
-            # https://hidemy.name/en/proxy-list/?type=hs#list
-            self._session.proxies = {'http': '5.189.133.231', 'https': '5.189.133.231'}
+        self._session.proxies = self.proxies
         return self._session
 
     def search(self, manga_name) -> [Manga]:
