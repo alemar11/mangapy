@@ -35,7 +35,7 @@ class ChapterArchiver(object):
         if pdf:
             pdf_path = self.path.joinpath('pdf')
             pdf_path.mkdir(parents=True, exist_ok=True)
-            chapter_pdf_file_path = self.pdf_path.joinpath(str(chapter.number) + '.pdf')
+            chapter_pdf_file_path = pdf_path.joinpath(str(chapter.number) + '.pdf')
             self._create_chapter_pdf(chapter_images_path, chapter_pdf_file_path)
             shutil.rmtree(chapter_images_path)
 
