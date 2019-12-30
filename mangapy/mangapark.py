@@ -150,6 +150,7 @@ class MangaParkChapter(Chapter):
                 pages.append(Page(page['n'], url))
         return pages
 
+
 if __name__ == '__main__':
     repo = MangaParkRepository()
     manga = repo.search('naruto')
