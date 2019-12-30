@@ -13,7 +13,7 @@ pip install --upgrade mangapy
 
 ## Usage
 
-Mangapy let you download manga chapters as images or pdfs:
+Mangapy let you download manga chapters as images (default) or pdfs:
 
 Downloads all Bleach chatpers as images inside the *Downloads* folder (from Fanfox source).
 ```
