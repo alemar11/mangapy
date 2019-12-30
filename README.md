@@ -13,17 +13,24 @@ pip install --upgrade mangapy
 
 ## Usage
 
-Downloads all Bleach chatpers inside the *Downloads* folder (from Fanfox source).
+Mangapy let you download manga chapters as images or pdfs:
+
+Downloads all Bleach chatpers as images inside the *Downloads* folder (from Fanfox source).
 ```
 mangapy bleach -a -o ~/Downloads
 ```
 
-Downloads Bleach chatper 1 inside the *Downloads* folder (from Fanfox source).
+Downloads all Bleach chatpers as a single **.pdf** file inside the *Downloads* folder (from Fanfox source).
+```
+mangapy bleach -a -o ~/Downloads --pdf
+```
+
+Downloads Bleach chatper 1 as images inside the *Downloads* folder (from Fanfox source).
 ```
 mangapy bleach -c 1 -o ~/Downloads
 ```
 
-Downloads Bleach chatpers from 0 to 10 (included) inside the *Downloads* folder using MangaPark as source.
+Downloads Bleach chatpers from 0 to 10 (included) as images inside the *Downloads* folder using MangaPark as source.
 ```
 mangapy bleach -c 0-10 -o ~/Downloads -s mangapark
 ```

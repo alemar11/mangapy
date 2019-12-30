@@ -1,5 +1,6 @@
 import re
 import requests
+import shutil
 from functools import partial
 from tqdm import tqdm
 from PIL import Image
@@ -15,11 +16,13 @@ class ChapterArchiver(object):
     def __init__(self, path: str, max_workers=1):
         self.max_workers = max_workers
         self.path = Path(path).expanduser()
-        self.images_path = self.path.joinpath('images')
-        self.pdf_path = self.path.joinpath('pdf')
 
-    def archive(self, chapter: Chapter):
-        chapter_images_path = self.images_path.joinpath(str(chapter.number))
+    def archive(self, chapter: Chapter, pdf: bool):
+        if pdf:
+            images_path = self.path.joinpath('.images')
+        else:
+            images_path = self.path.joinpath('images')
+        chapter_images_path = images_path.joinpath(str(chapter.number))
         chapter_images_path.mkdir(parents=True, exist_ok=True)
         pages = chapter.pages()
         description = ('Chapter {0}'.format(str(chapter.number)))
@@ -28,9 +31,12 @@ class ChapterArchiver(object):
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             list(tqdm(executor.map(func, pages), total=len(pages), desc=description, unit='pages', ncols=100))
 
-        self.pdf_path.mkdir(parents=True, exist_ok=True)
-        chapter_pdf_file_path = self.pdf_path.joinpath(str(chapter.number) + '.pdf')
-        self._create_chapter_pdf(chapter_images_path, chapter_pdf_file_path)
+        if pdf:
+            pdf_path = self.path.joinpath('pdf')
+            pdf_path.mkdir(parents=True, exist_ok=True)
+            chapter_pdf_file_path = self.pdf_path.joinpath(str(chapter.number) + '.pdf')
+            self._create_chapter_pdf(chapter_images_path, chapter_pdf_file_path)
+            shutil.rmtree(chapter_images_path)
 
     def _fetch_image(self, url: str):
         response = self.session.get(url, verify=False)

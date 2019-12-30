@@ -18,6 +18,7 @@ def cmd_parse():
     parser.add_argument('-s', '--source', type=str, help="manga source")
     parser.add_argument('-o', '--out', type=str, default='.', help='download directory', required=True)
     parser.add_argument('-d', '--debug', action='store_true', help="set log to DEBUG level")
+    parser.add_argument('-p', '--pdf', action='store_true', help="create a pdf for each chapter")
     group = parser.add_mutually_exclusive_group()
     group.add_argument('-a', '--all', action='store_true', help="download all chapters available")
     group.add_argument('-c', '--chapter', type=str, help="chapter(s) number to download")
@@ -114,7 +115,7 @@ def main():
     archiver = ChapterArchiver(directory, max_workers=max_workers)
     for chapter in chapters:
         try:
-            archiver.archive(chapter)
+            archiver.archive(chapter, args.pdf)
         except Exception as e:
             logging.error(e.msg)
 
@@ -124,9 +125,10 @@ def main():
 if __name__ == '__main__':
     sys.argv.insert(1, 'bleach')
     # sys.argv.insert(1, "Naruto - Eroi no Vol.1 (Doujinshi)")
-    sys.argv.insert(2, '-o ~/Downloads/mangapy')
+    sys.argv.insert(2, '-o ~/Downloads/mangapy_test')
     # sys.argv.insert(2, "-c 0")
     sys.argv.insert(3, '-c 0-1')
     sys.argv.insert(4, '-s mangapark')
     # sys.argv.insert(5, '--debug')
+    sys.argv.insert(5, '--pdf')
     main()
