@@ -22,6 +22,7 @@ class ChapterArchiver(object):
             images_path = self.path.joinpath('.images')
         else:
             images_path = self.path.joinpath('images')
+
         chapter_images_path = images_path.joinpath(str(chapter.number))
         chapter_images_path.mkdir(parents=True, exist_ok=True)
         pages = chapter.pages()
