@@ -49,25 +49,25 @@ mangapy "one piece" -o ~/Downloads -p '{"http": "194.226.34.132:8888", "https": 
 
 ## Development
 
-Install from local folder
+Install from local folder  
 
 ```
 pip install .
 ```
 
-Install from local folder (editable mode)
+Install from local folder (editable mode)  
 
 ```
 pip install -e .
 ```
 
-Install a local setup.py into your virtual environment/Pipfile:
+Install a local setup.py into your virtual environment/Pipfile:  
 
 ```
 pipenv install -e .
 ```
 
-Run tests:
+Run tests:  
 
 ```
 pipenv run pytest
