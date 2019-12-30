@@ -1,4 +1,5 @@
 import argparse
+import json
 import logging
 import os
 import pkg_resources
@@ -18,7 +19,9 @@ def cmd_parse():
     parser.add_argument('-s', '--source', type=str, help="manga source")
     parser.add_argument('-o', '--out', type=str, default='.', help='download directory', required=True)
     parser.add_argument('-d', '--debug', action='store_true', help="set log to DEBUG level")
-    parser.add_argument('-p', '--pdf', action='store_true', help="create a pdf for each chapter")
+    parser.add_argument('--pdf', action='store_true', help="create a pdf for each chapter")
+
+    parser.add_argument('-p', '--proxy', type=json.loads, help="use a proxy to download the chapters")
     group = parser.add_mutually_exclusive_group()
     group.add_argument('-a', '--all', action='store_true', help="download all chapters available")
     group.add_argument('-c', '--chapter', type=str, help="chapter(s) number to download")
@@ -49,6 +52,7 @@ def main():
     title = args.title.strip()
     directory = args.out.strip()
     source = args.source
+
     if args.debug:
         log.setLevel(logging.DEBUG)
     else:
@@ -71,12 +75,24 @@ def main():
         else:
             sys.exit('source is missing')
 
-    print('Searching {0}...'.format(title))
-    manga = repository.search(title)
+    if args.proxy:
+        if 'http' and 'https' in args.proxy.keys():
+            print('Setting proxy')
+            repository.proxies = args.proxy
+        else:
+            print('The proxy is not in the right format and it will not be used.')
+
+    print('Searching for {0}...'.format(title))
+    try:
+        manga = repository.search(title)
+    except Exception as e:
+        logging.error(str(e))
+        sys.exit(str(e))
+
     if manga is None or len(manga.chapters) <= 0:
         sys.exit('Manga {0} doesn\'t exist.'.format(title))
 
-    print('Manga found')
+    print('{0} found ✅'.format(title))
     directory = os.path.join(directory, repository_directory, manga.subdirectory)
     chapters = []
 
@@ -117,18 +133,16 @@ def main():
         try:
             archiver.archive(chapter, args.pdf)
         except Exception as e:
-            logging.error(e.msg)
+            logging.error(str(e))
 
-    print('Chapters downloading finished')
+    print('Chapters downloading finished 🎉')
 
 
 if __name__ == '__main__':
     sys.argv.insert(1, 'bleach')
-    # sys.argv.insert(1, "Naruto - Eroi no Vol.1 (Doujinshi)")
     sys.argv.insert(2, '-o ~/Downloads/mangapy_test')
-    # sys.argv.insert(2, "-c 0")
     sys.argv.insert(3, '-c 0-1')
     sys.argv.insert(4, '-s mangapark')
-    # sys.argv.insert(5, '--debug')
     sys.argv.insert(5, '--pdf')
+    # sys.argv.insert(6, '-p {"http": "194.226.34.132:8888", "https": "194.226.34.132:8888"}')
     main()

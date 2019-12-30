@@ -35,6 +35,13 @@ Downloads Bleach chatpers from 0 to 10 (included) as images inside the *Download
 mangapy bleach -c 0-10 -o ~/Downloads -s mangapark
 ```
 
+You may need a proxy to download certain manga, to do so use the option *-p or --proxy*:
+Downloads the last One Piece chapter as images inside the *Downloads* folder (from Fanfox source) using the proxy during the search.
+
+```
+mangapy "one piece" -o ~/Downloads -p '{"http": "194.226.34.132:8888", "https": "194.226.34.132:8888"}'
+```
+
 ## Development
 
 Install from local folder
