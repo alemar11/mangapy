@@ -56,7 +56,8 @@ class FanFoxRepository(MangaRepository):
         soup = BeautifulSoup(content, features="html.parser")
 
         # list-2 contains all the chapters, list-1 only the last volume
-        all_chapters = soup.find('div', {'id': 'list-2'})
+        # we use list-1 only if the list-2 doesn't exists
+        all_chapters = soup.find('div', {'id': 'list-2'}) or soup.find('div', {'id': 'list-1'})
 
         if all_chapters is None:
             blocked = soup.find('p', {'class': 'detail-block-content'})
@@ -155,5 +156,5 @@ class FanFoxChapter(Chapter):
 
 if __name__ == '__main__':
     repo = FanFoxRepository()
-    manga = repo.search('naruto')
+    manga = repo.search('kimetsu no yaiba')
     assert manga is not None
