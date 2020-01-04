@@ -46,34 +46,3 @@ Downloads the last One Piece chapter as images inside the *Downloads* folder (fr
 ```
 mangapy "one piece" -o ~/Downloads -p '{"http": "194.226.34.132:8888", "https": "194.226.34.132:8888"}'
 ```
-
-## Development
-
-Install from local folder  
-
-```
-pip install .
-```
-
-Install from local folder (editable mode)  
-
-```
-pip install -e .
-```
-
-Install a local setup.py into your virtual environment/Pipfile:  
-
-```
-pipenv install -e .
-```
-
-Run tests:  
-
-```
-pipenv run pytest
-```
-
-Run tests defined in a specific test and stopping them once the first failure occurs (`-x`)
-```
-pipenv run pytest tests/test_fanfox.py -x
-```
