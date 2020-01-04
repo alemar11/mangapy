@@ -11,6 +11,22 @@ def test_fetch_not_existing_manga():
 
 def test_fetch_manga():
     repository = FanFoxRepository()
+    manga = repository.search('kimetsu no yaiba')
+    assert manga is not None
+    assert len(manga.chapters) >= 209, "It should contain at least 209 chapters"
+    firstChapter = manga.chapters[0]
+    assert firstChapter is not None
+    pages = firstChapter.pages()
+    first_chapter_count = 0
+    for page in pages:
+        first_chapter_count += 1
+        assert page.number is not None
+        assert page.url is not None
+    assert first_chapter_count == 56, "The first chapter sould contain 56 pages"
+
+
+def test_fetch_manga_licensed():
+    repository = FanFoxRepository()
     repository.proxies = proxies
     manga = repository.search('naruto')
     assert manga is not None
@@ -23,7 +39,7 @@ def test_fetch_manga():
         first_chapter_count += 1
         assert page.number is not None
         assert page.url is not None
-    assert first_chapter_count == 47, "The first Naruto chapter sould contain 47 pages"
+    assert first_chapter_count == 47, "The first chapter sould contain 47 pages"
 
     lastChapter = manga.chapters[-1]
     assert lastChapter is not None
@@ -33,7 +49,7 @@ def test_fetch_manga():
         last_chapter_count += 1
         assert page.number is not None
         assert page.url is not None
-    assert last_chapter_count == 46, "The last Naruto chapter sould contain 46 pages"
+    assert last_chapter_count == 46, "The last chapter sould contain 46 pages"
 
 
 def test_fetch_adult_content():

@@ -14,6 +14,23 @@ def test_fetch_not_existing_manga():
 @pytest.mark.filterwarnings('ignore::urllib3.exceptions.InsecureRequestWarning')
 def test_fetch_manga():
     repository = MangaParkRepository()
+    manga = repository.search('kimetsu no yaiba gotouge koyoharu')
+    assert manga is not None
+    assert len(manga.chapters) >= 188, "It should contain at least 188 chapters"
+    firstChapter = manga.chapters[0]
+    assert firstChapter is not None
+    pages = firstChapter.pages()
+    first_chapter_count = 0
+    for page in pages:
+        first_chapter_count += 1
+        assert page.number is not None
+        assert page.url is not None
+    assert first_chapter_count == 55, "The first chapter sould contain 55 pages"
+
+
+@pytest.mark.filterwarnings('ignore::urllib3.exceptions.InsecureRequestWarning')
+def test_fetch_manga_licensed():
+    repository = MangaParkRepository()
     repository.proxies = proxies
     manga = repository.search('naruto')
     assert manga is not None
@@ -26,7 +43,7 @@ def test_fetch_manga():
         first_chapter_count += 1
         assert page.number is not None
         assert page.url is not None
-    assert first_chapter_count == 46, "The first Naruto chapter sould contain 46 pages"
+    assert first_chapter_count == 46, "The first chapter sould contain 46 pages"
 
     lastChapter = manga.chapters[-1]
     assert lastChapter is not None
@@ -36,7 +53,7 @@ def test_fetch_manga():
         last_chapter_count += 1
         assert page.number is not None
         assert page.url is not None
-    assert last_chapter_count == 18, "The last Naruto chapter sould contain 18 pages"
+    assert last_chapter_count == 18, "The last chapter sould contain 18 pages"
 
 
 @pytest.mark.filterwarnings('ignore::urllib3.exceptions.InsecureRequestWarning')
