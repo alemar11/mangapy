@@ -9,6 +9,7 @@ pylint = "*"
 v = {editable = true,version = "*"}
 pytest = "*"
 rope = "*"
+mangapy = {editable = true,path = "."}
 
 [packages]
 bs4 = "*"

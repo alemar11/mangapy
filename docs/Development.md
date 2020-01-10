@@ -15,7 +15,7 @@ pip install -e .
 Install a local setup.py into your virtual environment/Pipfile:  
 
 ```
-pipenv install -e .
+pipenv install --dev -e .
 ```
 
 Recreate the virtual env:
