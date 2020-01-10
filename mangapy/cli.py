@@ -101,7 +101,7 @@ def main():
 
     elif args.chapter:
         try:
-            chapter_number = int(args.chapter.strip())
+            chapter_number = float(args.chapter.strip())
         except ValueError:
             sys.exit("Invalid chapter number.")
 
@@ -141,8 +141,9 @@ def main():
 if __name__ == '__main__':
     sys.argv.insert(1, 'bleach')
     sys.argv.insert(2, '-o ~/Downloads/mangapy_test')
-    sys.argv.insert(3, '-c 0-1')
-    sys.argv.insert(4, '-s mangapark')
+    #sys.argv.insert(3, '-c 0-1')
+    sys.argv.insert(3, '-c 428.1')
+    #sys.argv.insert(4, '-s mangapark')
     sys.argv.insert(5, '--pdf')
     # sys.argv.insert(6, '-p {"http": "194.226.34.132:8888", "https": "194.226.34.132:8888"}')
     main()

@@ -23,10 +23,11 @@ class ChapterArchiver(object):
         else:
             images_path = self.path.joinpath('images')
 
+        chapter_name = str(int(chapter.number)) if chapter.number.is_integer() else str(chapter.number)
         chapter_images_path = images_path.joinpath(str(chapter.number))
         chapter_images_path.mkdir(parents=True, exist_ok=True)
         pages = chapter.pages()
-        description = ('Chapter {0}'.format(str(chapter.number)))
+        description = ('Chapter {0}'.format(chapter_name))
         func = partial(self._save_image, chapter_images_path)  # currying
 
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
@@ -35,7 +36,7 @@ class ChapterArchiver(object):
         if pdf:
             pdf_path = self.path.joinpath('pdf')
             pdf_path.mkdir(parents=True, exist_ok=True)
-            chapter_pdf_file_path = pdf_path.joinpath(str(chapter.number) + '.pdf')
+            chapter_pdf_file_path = pdf_path.joinpath(chapter_name + '.pdf')
             self._create_chapter_pdf(chapter_images_path, chapter_pdf_file_path)
             shutil.rmtree(chapter_images_path)
 
