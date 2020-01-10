@@ -7,11 +7,11 @@ with open('README.md') as f:
 
 setup(
     author="Alessandro Marzoli",
-    author_email="alessandromarzoli@gmail.com",
+    author_email="me@alessandromarzoli.com",
     name='mangapy',
     license="MIT",
     description='Manga downloader',
-    version='1.1.1',
+    version='1.2.0',
     long_description=README,
     url='https://github.com/alemar11/mangapy',
     packages=find_packages(),
