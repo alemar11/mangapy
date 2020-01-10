@@ -82,7 +82,7 @@ def main():
         else:
             print('The proxy is not in the right format and it will not be used.')
 
-    print('Searching for {0}...'.format(title))
+    print('🔎 Searching for {0}...'.format(title))
     try:
         manga = repository.search(title)
     except Exception as e:
@@ -92,7 +92,7 @@ def main():
     if manga is None or len(manga.chapters) <= 0:
         sys.exit('Manga {0} doesn\'t exist.'.format(title))
 
-    print('{0} found ✅'.format(title))
+    print('✅ {0} found'.format(title))
     directory = os.path.join(directory, repository_directory, manga.subdirectory)
     chapters = []
 
@@ -103,14 +103,14 @@ def main():
         try:
             chapter_number = float(args.chapter.strip())
         except ValueError:
-            sys.exit("Invalid chapter number.")
+            sys.exit("❌ Invalid chapter number.")
 
         for chapter in manga.chapters:
             if chapter.number == chapter_number:
                 chapters.append(chapter)
                 break
         else:
-            sys.exit("Chapter doesn't exist.")
+            sys.exit("❌ Chapter doesn't exist.")
 
     elif args.begin is not None and args.begin >= 0:
         start = None
@@ -127,7 +127,7 @@ def main():
         last_chapter = manga.last_chapter
         chapters.append(last_chapter)
 
-    print('Chapters downloading...')
+    print('⬇️ Downloading...')
     archiver = ChapterArchiver(directory, max_workers=max_workers)
     for chapter in chapters:
         try:
@@ -135,7 +135,7 @@ def main():
         except Exception as e:
             logging.error(str(e))
 
-    print('Chapters downloading finished 🎉')
+    print('Download finished 🎉🎉🎉')
 
 
 if __name__ == '__main__':
