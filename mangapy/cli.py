@@ -8,8 +8,11 @@ from mangapy.mangapark import MangaParkRepository
 from mangapy.fanfox import FanFoxRepository
 from mangapy.chapter_archiver import ChapterArchiver
 from mangapy import log
+from pathlib import Path
+
 
 version = pkg_resources.require("mangapy")[0].version
+path_to_download_folder = str(os.path.join(Path.home(), "Downloads", "mangapy"))
 
 
 def cmd_parse():
@@ -17,7 +20,7 @@ def cmd_parse():
     parser = argparse.ArgumentParser()
     parser.add_argument('title', type=str, help="manga title to download")
     parser.add_argument('-s', '--source', type=str, help="manga source")
-    parser.add_argument('-o', '--out', type=str, default='.', help='download directory', required=True)
+    parser.add_argument('-o', '--out', type=str, default=path_to_download_folder, help='download directory')
     parser.add_argument('-d', '--debug', action='store_true', help="set log to DEBUG level")
     parser.add_argument('--pdf', action='store_true', help="create a pdf for each chapter")
 
