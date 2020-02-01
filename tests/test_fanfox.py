@@ -27,7 +27,7 @@ def test_fetch_manga():
 
 def test_fetch_manga_licensed():
     repository = FanFoxRepository()
-    repository.proxies = proxies
+    #repository.proxies = proxies
     manga = repository.search('naruto')
     assert manga is not None
     assert len(manga.chapters) == 750, "It should contain 750 chapters"

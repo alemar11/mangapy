@@ -31,7 +31,7 @@ def test_fetch_manga():
 @pytest.mark.filterwarnings('ignore::urllib3.exceptions.InsecureRequestWarning')
 def test_fetch_manga_licensed():
     repository = MangaParkRepository()
-    repository.proxies = proxies
+    #repository.proxies = proxies
     manga = repository.search('naruto')
     assert manga is not None
     assert len(manga.chapters) == 701, "It should contain 701 chapters"
@@ -59,7 +59,7 @@ def test_fetch_manga_licensed():
 @pytest.mark.filterwarnings('ignore::urllib3.exceptions.InsecureRequestWarning')
 def test_fetch_mangapark_adult_content():
     repository = MangaParkRepository()
-    repository.proxies = proxies
+    #repository.proxies = proxies
     manga = repository.search('emergence')
     assert manga is not None
     assert len(manga.chapters) == 7, "It should contain 7 chapters"
@@ -74,7 +74,7 @@ def test_fetch_mangapark_adult_content():
 @pytest.mark.filterwarnings('ignore::urllib3.exceptions.InsecureRequestWarning')
 def test_fetch_mangapark_adult_content_with_single_volume():
     repository = MangaParkRepository()
-    repository.proxies = proxies
+    #repository.proxies = proxies
     manga = repository.search('Naruto - Eroi no Vol.1 (Doujinshi)')
     assert manga is not None
     assert len(manga.chapters) == 1, "It should contain only 1 chapter"

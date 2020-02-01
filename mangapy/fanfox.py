@@ -156,5 +156,5 @@ class FanFoxChapter(Chapter):
 
 if __name__ == '__main__':
     repo = FanFoxRepository()
-    manga = repo.search('kimetsu no yaiba')
+    manga = repo.search('naruto')
     assert manga is not None
