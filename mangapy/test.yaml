@@ -1,0 +1,15 @@
+--- 
+ debug: true
+ destination: "~/Downloads/mangapy"
+ fanfox:
+  - title: "bleach"
+    pdf: true
+    chapter: "10"
+    proxy: ""
+  - title: naruto
+    pdf: true
+    chapter: "10-13"
+    proxy: ""
+  - title: "black clover"
+    pdf: true
+    proxy: ""

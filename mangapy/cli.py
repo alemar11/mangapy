@@ -1,9 +1,11 @@
 import argparse
+import yaml
 import json
 import logging
 import os
 import pkg_resources
 import sys
+from mangapy.mangarepository import MangaRepository
 from mangapy.mangapark import MangaParkRepository
 from mangapy.fanfox import FanFoxRepository
 from mangapy.chapter_archiver import ChapterArchiver
@@ -12,22 +14,31 @@ from pathlib import Path
 
 
 version = pkg_resources.require("mangapy")[0].version
-path_to_download_folder = str(os.path.join(Path.home(), "Downloads", "mangapy"))
+default_path_to_download_folder = str(os.path.join(Path.home(), "Downloads", "mangapy"))
 
 
 def cmd_parse():
     """Returns parsed arguments from command line"""
     parser = argparse.ArgumentParser()
-    parser.add_argument('title', type=str, help="manga title to download")
-    parser.add_argument('-s', '--source', type=str, help="manga source")
-    parser.add_argument('-o', '--out', type=str, default=path_to_download_folder, help='download directory')
-    parser.add_argument('-d', '--debug', action='store_true', help="set log to DEBUG level")
-    parser.add_argument('--pdf', action='store_true', help="create a pdf for each chapter")
 
-    parser.add_argument('-p', '--proxy', type=json.loads, help="use a proxy to download the chapters")
-    group = parser.add_mutually_exclusive_group()
+    subparsers = parser.add_subparsers(help='Download modes.')
+
+    yaml_parser = subparsers.add_parser("yaml")
+    args_parser = subparsers.add_parser("title")
+
+    yaml_parser.add_argument('yaml_path', type=str, help=".yaml path")
+
+    args_parser.add_argument('manga_title', type=str, help="manga title to download")
+    args_parser.add_argument('-s', '--source', type=str, help="manga source")
+    args_parser.add_argument('-o', '--out', type=str, default=default_path_to_download_folder, help='download directory')
+    args_parser.add_argument('-d', '--debug', action='store_true', help="set log to DEBUG level")
+    args_parser.add_argument('--pdf', action='store_true', help="create a pdf for each chapter")
+
+    args_parser.add_argument('-p', '--proxy', type=json.loads, help="use a proxy to download the chapters")
+    group = args_parser.add_mutually_exclusive_group()
     group.add_argument('-a', '--all', action='store_true', help="download all chapters available")
     group.add_argument('-c', '--chapter', type=str, help="chapter(s) number to download")
+    
     parser.add_argument('-v', '--version',
                         action='version',
                         version='{0} {1}'.format(parser.prog, version),
@@ -50,9 +61,38 @@ def cmd_parse():
     return args
 
 
+def main2(source, proxy, output, manga_title, chapter, all,) -> MangaRepository:
+    # debug should be set previously
+    repository = FanFoxRepository()
+    if source is None:
+        repository = FanFoxRepository()
+        repository_directory = 'fanfox'
+        max_workers = 1  # to avoid bot detection
+    else:
+        source = source.strip().lower()
+        if source == 'fanfox':
+            repository = FanFoxRepository()
+            repository_directory = source
+            max_workers = 1  # to avoid bot detection
+        elif source == 'mangapark':
+            repository = MangaParkRepository()
+            repository_directory = source
+            max_workers = 5
+        else:
+            sys.exit('source is missing')
+
+    if args.proxy:
+        if 'http' and 'https' in args.proxy.keys():
+            print('Setting proxy')
+            repository.proxies = args.proxy
+        else:
+            print('The proxy is not in the right format and it will not be used.')
+
+    return
+
 def main():
     args = cmd_parse()
-    title = args.title.strip()
+    manga_title = args.manga_title.strip()
     directory = args.out.strip()
     source = args.source
 
@@ -85,17 +125,17 @@ def main():
         else:
             print('The proxy is not in the right format and it will not be used.')
 
-    print('🔎 Searching for {0}...'.format(title))
+    print('🔎 Searching for {0}...'.format(manga_title))
     try:
-        manga = repository.search(title)
+        manga = repository.search(manga_title)
     except Exception as e:
         logging.error(str(e))
         sys.exit(str(e))
 
     if manga is None or len(manga.chapters) <= 0:
-        sys.exit('Manga {0} doesn\'t exist.'.format(title))
+        sys.exit('Manga {0} doesn\'t exist.'.format(manga_title))
 
-    print('✅ {0} found'.format(title))
+    print('✅ {0} found'.format(manga_title))
     directory = os.path.join(directory, repository_directory, manga.subdirectory)
     chapters = []
 
@@ -142,11 +182,21 @@ def main():
 
 
 if __name__ == '__main__':
-    sys.argv.insert(1, 'bleach')
-    sys.argv.insert(2, '-o ~/Downloads/mangapy_test')
-    #sys.argv.insert(3, '-c 0-1')
-    sys.argv.insert(3, '-c 428.1')
-    #sys.argv.insert(4, '-s mangapark')
-    sys.argv.insert(5, '--pdf')
-    # sys.argv.insert(6, '-p {"http": "194.226.34.132:8888", "https": "194.226.34.132:8888"}')
+    # current_folder = os.path.dirname(os.path.abspath(__file__))
+    # yaml_file = os.path.join(current_folder, 'test.yaml')
+    # stream = open(yaml_file, 'r')
+    # dictionary = yaml.load(stream, Loader=yaml.FullLoader)
+    # for key, value in dictionary.items():
+    #     print(key + " : " + str(value))
+    
+
+    sys.argv.insert(1, 'title')
+    sys.argv.insert(2, 'bleach')
+    sys.argv.insert(3, '-o ~/Downloads/mangapy_test')
+    #sys.argv.insert(4, '-c 0-1')
+    sys.argv.insert(4, '-c 428.1')
+    #sys.argv.insert(5, '-s mangapark')
+    sys.argv.insert(6, '--pdf')
+    # sys.argv.insert(7, '-p {"http": "194.226.34.132:8888", "https": "194.226.34.132:8888"}')
+
     main()

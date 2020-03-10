@@ -16,7 +16,7 @@ setup(
     url='https://github.com/alemar11/mangapy',
     packages=find_packages(),
     python_requires=">=3.7",
-    install_requires=['bs4', 'pillow', 'requests', 'tqdm'],
+    install_requires=['bs4', 'pillow', 'pyyaml', 'requests', 'tqdm'],
     classifiers=[
         # (https://pypi.python.org/pypi?%3Aaction=list_classifiers)
         'Development Status :: 5 - Production/Stable',
