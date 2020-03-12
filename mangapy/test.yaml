@@ -1,15 +1,21 @@
 --- 
- debug: true
- destination: "~/Downloads/mangapy"
+ debug: true # optional
+ output: "~/Downloads/mangapy"
+ proxy: "" # optional
  fanfox:
   - title: "bleach"
     pdf: true
-    chapter: "10"
-    proxy: ""
-  - title: naruto
+    download_chapter: "10"
+  - title: "naruto"
     pdf: true
-    chapter: "10-13"
-    proxy: ""
-  - title: "black clover"
-    pdf: true
-    proxy: ""
+    download_chapters: "10-13"
+#   - title: "black clover"
+#     download_all: True
+#     pdf: true
+#  mangapark:
+#   - title: "black clover"
+#     pdf: true
+#     download_last: True
+#   - title: "Daiya no A"
+#     pdf: true
+#     download_chapters: "111-"
