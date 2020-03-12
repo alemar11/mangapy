@@ -21,12 +21,12 @@ def cmd_parse():
     """Returns parsed arguments from command line"""
     parser = argparse.ArgumentParser()
 
-    subparsers = parser.add_subparsers(help='Download modes.')
+    subparsers = parser.add_subparsers(help='Download modes.', dest='mode')
 
     yaml_parser = subparsers.add_parser("yaml")
     args_parser = subparsers.add_parser("title")
 
-    yaml_parser.add_argument('yaml_path', type=str, help=".yaml path")
+    yaml_parser.add_argument('yaml_file', type=str, help="Path to the .yaml file")
 
     args_parser.add_argument('manga_title', type=str, help="manga title to download")
     args_parser.add_argument('-s', '--source', type=str, help="manga source")
@@ -48,7 +48,7 @@ def cmd_parse():
     args.begin = None
     args.end = None
 
-    if args.chapter:
+    if args.mode == 'title' and args.chapter:
         chapter = args.chapter.split('-')
         if len(chapter) == 2:
             args.chapter = None
@@ -61,37 +61,30 @@ def cmd_parse():
     return args
 
 
-def main2(source, proxy, output, manga_title, chapter, all,) -> MangaRepository:
-    # debug should be set previously
-    repository = FanFoxRepository()
-    if source is None:
-        repository = FanFoxRepository()
-        repository_directory = 'fanfox'
-        max_workers = 1  # to avoid bot detection
-    else:
-        source = source.strip().lower()
-        if source == 'fanfox':
-            repository = FanFoxRepository()
-            repository_directory = source
-            max_workers = 1  # to avoid bot detection
-        elif source == 'mangapark':
-            repository = MangaParkRepository()
-            repository_directory = source
-            max_workers = 5
-        else:
-            sys.exit('source is missing')
-
-    if args.proxy:
-        if 'http' and 'https' in args.proxy.keys():
-            print('Setting proxy')
-            repository.proxies = args.proxy
-        else:
-            print('The proxy is not in the right format and it will not be used.')
-
-    return
-
 def main():
     args = cmd_parse()
+    if args.mode == 'title':
+        main_title(args)
+    elif args.mode == 'yaml':
+        main_yaml(args)
+
+
+def main_yaml(args: argparse.Namespace):
+    yaml_file = args.yaml_file.strip()
+    stream = open(yaml_file, 'r')
+    dictionary = yaml.load(stream, Loader=yaml.FullLoader)
+
+    if dictionary['debug']:
+        log.setLevel(logging.DEBUG)
+    else:
+        log.setLevel(logging.ERROR)
+
+    for key, value in dictionary.items():
+        print(key + " : " + str(value))
+    return
+
+
+def main_title(args: argparse.Namespace):
     manga_title = args.manga_title.strip()
     directory = args.out.strip()
     source = args.source
@@ -182,21 +175,24 @@ def main():
 
 
 if __name__ == '__main__':
-    # current_folder = os.path.dirname(os.path.abspath(__file__))
-    # yaml_file = os.path.join(current_folder, 'test.yaml')
+    current_folder = os.path.dirname(os.path.abspath(__file__))
+    yaml_file = os.path.join(current_folder, 'test.yaml')
+
     # stream = open(yaml_file, 'r')
     # dictionary = yaml.load(stream, Loader=yaml.FullLoader)
     # for key, value in dictionary.items():
     #     print(key + " : " + str(value))
-    
+    # p = 'yaml_path {0}'.format(yaml_file)
+    sys.argv.insert(1, 'yaml')
+    sys.argv.insert(2, yaml_file)
 
-    sys.argv.insert(1, 'title')
-    sys.argv.insert(2, 'bleach')
-    sys.argv.insert(3, '-o ~/Downloads/mangapy_test')
-    #sys.argv.insert(4, '-c 0-1')
-    sys.argv.insert(4, '-c 428.1')
-    #sys.argv.insert(5, '-s mangapark')
-    sys.argv.insert(6, '--pdf')
-    # sys.argv.insert(7, '-p {"http": "194.226.34.132:8888", "https": "194.226.34.132:8888"}')
+    # sys.argv.insert(1, 'title')
+    # sys.argv.insert(2, 'bleach')
+    # sys.argv.insert(3, '-o ~/Downloads/mangapy_test')
+    # #sys.argv.insert(4, '-c 0-1')
+    # sys.argv.insert(4, '-c 428.1')
+    # #sys.argv.insert(5, '-s mangapark')
+    # sys.argv.insert(6, '--pdf')
+    # # sys.argv.insert(7, '-p {"http": "194.226.34.132:8888", "https": "194.226.34.132:8888"}')
 
     main()
