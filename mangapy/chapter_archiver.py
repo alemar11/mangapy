@@ -1,3 +1,4 @@
+import os
 import re
 import requests
 import shutil
@@ -30,6 +31,13 @@ class ChapterArchiver(object):
         description = ('Chapter {0}'.format(chapter_name))
         func = partial(self._save_image, chapter_images_path)  # currying
 
+        if pdf:
+            pdf_path = self.path.joinpath('pdf')
+            chapter_pdf_file_path = pdf_path.joinpath(chapter_name + '.pdf')
+            if os.path.isfile(chapter_pdf_file_path):
+                print("⏺  {0} already downloaded and it will skipped.".format(chapter_name))
+                return  # early exit if the file is already on disk
+
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             list(tqdm(executor.map(func, pages), total=len(pages), desc=description, unit='pages', ncols=100))
 
@@ -50,6 +58,10 @@ class ChapterArchiver(object):
         file_name = str(page.number)
         image_url = page.url
         file_ext = urlparse(image_url).path.split('.')[-1]
+        file_path = image_path.joinpath(file_name + '.' + file_ext)
+        if os.path.isfile(file_path):
+            return  # early exit if the file is already on disk
+
         if image_url.startswith('//'):
             image_url = 'http:' + image_url
 
@@ -58,7 +70,6 @@ class ChapterArchiver(object):
         if data is None:
             return
 
-        file_path = image_path.joinpath(file_name + '.' + file_ext)
         output = open(file_path, "wb")
         output.write(data)
         output.close()

@@ -1,0 +1,23 @@
+--- 
+ debug: true # optional
+ output: "~/Downloads/mangapy"
+ proxy: # optional
+  http: "http://31.14.131.70:8080"
+  https: "http://31.14.131.70:8080" 
+ fanfox:
+  - title: "bleach"
+    pdf: true
+    download_single_chapter: "10"
+  - title: "naruto"
+    pdf: true
+    download_chapters: "10-13"
+  - title: "black clover"
+    download_all_chapters: True
+    pdf: true
+ mangapark:
+  - title: "black clover tabata yuuki"
+    pdf: true
+    download_last_chapter: True
+  - title: "Daiya no A"
+    pdf: true
+    download_chapters: "111-"
