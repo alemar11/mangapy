@@ -120,7 +120,7 @@ def main_yaml(args: argparse.Namespace):
                 download.enable_debug_log = debug_log
                 download.output = output
                 download.proxy = proxy
-                main_common(download)
+                start_download(download)
         
         if 'mangapark' in dictionary.keys():
             for download in list(map(lambda manga: MangaDownload(**manga), dictionary['mangapark'])):
@@ -128,10 +128,48 @@ def main_yaml(args: argparse.Namespace):
                 download.enable_debug_log = debug_log
                 download.output = output
                 download.proxy = proxy
-                main_common(download)
+                start_download(download)
 
 
-def main_common(download: MangaDownload):
+def main_title(args: argparse.Namespace):
+    download = MangaDownload()
+    download.title = args.manga_title.strip()
+    download.output = args.out.strip()
+    source = args.source
+
+    if args.debug:
+        download.enable_debug_log = True
+    else:
+        download.enable_debug_log = False
+
+    if source is None:
+        download.source = 'fanfox'
+    else:
+        download.source = source.strip().lower()
+
+    download.proxy = None
+    if args.proxy:
+        if 'http' and 'https' in args.proxy.keys():
+            print('Setting proxy')
+            download.proxy = args.proxy
+        else:
+            print('The proxy is not in the right format and it will not be used.')
+            
+    if args.all:
+        download.download_all_chapters = True
+
+    elif args.chapter:
+        chapters = args.chapter.split('-')
+        if len(chapters) == 2:
+            download.download_chapters = args.chapter
+        else:    
+            download.download_single_chapter = args.chapter.strip()
+    else:
+        download.download_last_chapter = True
+
+    start_download(download)
+
+def start_download(download: MangaDownload):
     if download.enable_debug_log:
         log.setLevel(logging.DEBUG)
     else:
@@ -212,46 +250,6 @@ def main_common(download: MangaDownload):
             logging.error(str(e))
 
     print('Download finished 🎉🎉🎉')
-
-
-def main_title(args: argparse.Namespace):
-    download = MangaDownload()
-    download.title = args.manga_title.strip()
-    download.output = args.out.strip()
-    source = args.source
-
-    if args.debug:
-        download.enable_debug_log = True
-    else:
-        download.enable_debug_log = False
-
-    if source is None:
-        download.source = 'fanfox'
-    else:
-        download.source = source.strip().lower()
-
-    download.proxy = None
-    if args.proxy:
-        if 'http' and 'https' in args.proxy.keys():
-            print('Setting proxy')
-            download.proxy = args.proxy
-        else:
-            print('The proxy is not in the right format and it will not be used.')
-            
-    if args.all:
-        download.download_all_chapters = True
-
-    elif args.chapter:
-        chapters = args.chapter.split('-')
-        if len(chapters) == 2:
-            download.download_chapters = args.chapter
-        else:    
-            download.download_single_chapter = args.chapter.strip()
-    else:
-        download.download_last_chapter = True
-
-    main_common(download)
-
 
 if __name__ == '__main__':
     #current_folder = os.path.dirname(os.path.abspath(__file__))
