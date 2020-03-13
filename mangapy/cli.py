@@ -100,6 +100,7 @@ def main_yaml(args: argparse.Namespace):
     with open(yaml_file, 'r') as f:
         dictionary = yaml.load(f, Loader=yaml.FullLoader)
         output = dictionary['output']
+        pdf = dictionary['pdf'] or False
 
         proxy = None
         if 'proxy' in dictionary.keys() and dictionary['proxy']:
@@ -119,6 +120,7 @@ def main_yaml(args: argparse.Namespace):
                 download.source = 'fanfox'
                 download.enable_debug_log = debug_log
                 download.output = output
+                download.pdf = pdf
                 download.proxy = proxy
                 start_download(download)
         
@@ -127,6 +129,7 @@ def main_yaml(args: argparse.Namespace):
                 download.source = 'mangapark'
                 download.enable_debug_log = debug_log
                 download.output = output
+                download.pdf = pdf
                 download.proxy = proxy
                 start_download(download)
 
@@ -135,6 +138,7 @@ def main_title(args: argparse.Namespace):
     download = MangaDownload()
     download.title = args.manga_title.strip()
     download.output = args.out.strip()
+    download.pdf = args.pdf or False
     source = args.source
 
     if args.debug:
@@ -162,12 +166,13 @@ def main_title(args: argparse.Namespace):
         chapters = args.chapter.split('-')
         if len(chapters) == 2:
             download.download_chapters = args.chapter
-        else:    
+        else:
             download.download_single_chapter = args.chapter.strip()
     else:
         download.download_last_chapter = True
 
     start_download(download)
+
 
 def start_download(download: MangaDownload):
     if download.enable_debug_log:
@@ -194,7 +199,7 @@ def start_download(download: MangaDownload):
 
     if download.proxy:
         repository.proxies = download.proxy
-       
+
     print('🔎  Searching for {0} in {1}...'.format(download.title, download.source))
     try:
         manga = repository.search(download.title)
@@ -251,21 +256,21 @@ def start_download(download: MangaDownload):
 
     print('Download finished 🎉🎉🎉')
 
+
 if __name__ == '__main__':
-    #current_folder = os.path.dirname(os.path.abspath(__file__))
-    main_folder = os.getcwd()
-    yaml_file = os.path.join(main_folder, 'sample.yaml')
+    # main_folder = os.getcwd()
+    # yaml_file = os.path.join(main_folder, 'sample.yaml')
+    # sys.argv.insert(1, 'yaml')
+    # sys.argv.insert(2, yaml_file)
 
-    sys.argv.insert(1, 'yaml')
-    sys.argv.insert(2, yaml_file)
-
-    # sys.argv.insert(1, 'title')
-    # sys.argv.insert(2, 'bleach')
-    # sys.argv.insert(3, '-o ~/Downloads/mangapy_test')
-    # #sys.argv.insert(4, '-c 11-12')
-    # sys.argv.insert(4, '-c 428.1')
-    # #sys.argv.insert(5, '-s mangapark')
-    # sys.argv.insert(6, '--pdf')
-    # #sys.argv.insert(7, '-p {"http": "http://31.14.131.70:8080", "https": "http://31.14.131.70:8080"}')
+    sys.argv.insert(1, 'title')
+    sys.argv.insert(2, 'bleach')
+    sys.argv.insert(3, '-o ~/Downloads/mangapy_test')
+    #sys.argv.insert(4, '-c 11-12')
+    sys.argv.insert(4, '-c 428.1')
+    #sys.argv.insert(5, '-s mangapark')
+    sys.argv.insert(6, '--pdf')
+    #sys.argv.insert(7, '--debug')
+    #sys.argv.insert(7, '-p {"http": "http://31.14.131.70:8080", "https": "http://31.14.131.70:8080"}')
 
     main()
