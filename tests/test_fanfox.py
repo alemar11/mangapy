@@ -23,7 +23,7 @@ def test_fetch_manga():
         first_chapter_count += 1
         assert page.number is not None
         assert page.url is not None
-    assert first_chapter_count == 55, "The first chapter sould contain 55 pages"
+    assert first_chapter_count == 56, "The first chapter sould contain 56 pages"
 
 
 @pytest.mark.skip(reason="It fails most of the time using Github Actions")
