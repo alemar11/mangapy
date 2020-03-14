@@ -246,7 +246,7 @@ def start_download(download: MangaDownload):
         last_chapter = manga.last_chapter
         chapters.append(last_chapter)
 
-    print('⬇️  Downloading...')
+    print('⬇️  Download started.')
     archiver = ChapterArchiver(directory, max_workers=max_workers)
     for chapter in chapters:
         try:
@@ -254,7 +254,7 @@ def start_download(download: MangaDownload):
         except Exception as e:
             logging.error(str(e))
 
-    print('Download finished 🎉🎉🎉')
+    print('🎉  Download finished.')
 
 
 if __name__ == '__main__':
