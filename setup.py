@@ -11,7 +11,7 @@ setup(
     name='mangapy',
     license="MIT",
     description='Manga downloader',
-    version='1.3.0',
+    version='1.3.1',
     long_description=README,
     url='https://github.com/alemar11/mangapy',
     packages=find_packages(),
