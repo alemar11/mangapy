@@ -13,6 +13,7 @@ setup(
     description='Manga downloader',
     version='1.3.1',
     long_description=README,
+    long_description_content_type='text/markdown',
     url='https://github.com/alemar11/mangapy',
     packages=find_packages(),
     python_requires=">=3.7",
