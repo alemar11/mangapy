@@ -100,7 +100,6 @@ def main_yaml(args: argparse.Namespace):
     with open(yaml_file, 'r') as f:
         dictionary = yaml.load(f, Loader=yaml.FullLoader)
         output = dictionary['output']
-        pdf = dictionary['pdf'] or False
 
         proxy = None
         if 'proxy' in dictionary.keys() and dictionary['proxy']:
@@ -120,7 +119,7 @@ def main_yaml(args: argparse.Namespace):
                 download.source = 'fanfox'
                 download.enable_debug_log = debug_log
                 download.output = output
-                download.pdf = pdf
+                #download.pdf = pdf
                 download.proxy = proxy
                 start_download(download)
         
@@ -258,19 +257,19 @@ def start_download(download: MangaDownload):
 
 
 if __name__ == '__main__':
-    # main_folder = os.getcwd()
-    # yaml_file = os.path.join(main_folder, 'sample.yaml')
-    # sys.argv.insert(1, 'yaml')
-    # sys.argv.insert(2, yaml_file)
+    main_folder = os.getcwd()
+    yaml_file = os.path.join(main_folder, 'sample2.yaml')
+    sys.argv.insert(1, 'yaml')
+    sys.argv.insert(2, yaml_file)
 
-    sys.argv.insert(1, 'title')
-    sys.argv.insert(2, 'bleach')
-    sys.argv.insert(3, '-o ~/Downloads/mangapy_test')
-    #sys.argv.insert(4, '-c 11-12')
-    sys.argv.insert(4, '-c 428.1')
-    #sys.argv.insert(5, '-s mangapark')
-    sys.argv.insert(6, '--pdf')
-    #sys.argv.insert(7, '--debug')
-    #sys.argv.insert(7, '-p {"http": "http://31.14.131.70:8080", "https": "http://31.14.131.70:8080"}')
+    # sys.argv.insert(1, 'title')
+    # sys.argv.insert(2, 'bleach')
+    # sys.argv.insert(3, '-o ~/Downloads/mangapy_test')
+    # #sys.argv.insert(4, '-c 11-12')
+    # sys.argv.insert(4, '-c 428.1')
+    # #sys.argv.insert(5, '-s mangapark')
+    # sys.argv.insert(6, '--pdf')
+    # #sys.argv.insert(7, '--debug')
+    # #sys.argv.insert(7, '-p {"http": "http://31.14.131.70:8080", "https": "http://31.14.131.70:8080"}')
 
     main()
