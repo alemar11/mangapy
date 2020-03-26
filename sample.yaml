@@ -1,9 +1,9 @@
 --- 
  debug: true # optional
  output: "~/Downloads/mangapy"
- proxy: # optional
-  http: "http://31.14.131.70:8080"
-  https: "http://31.14.131.70:8080" 
+#  proxy: # optional
+#   http: "http://31.14.131.70:8080"
+#   https: "http://31.14.131.70:8080" 
  fanfox:
   - title: "bleach"
     pdf: true

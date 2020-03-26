@@ -1,0 +1,16 @@
+--- 
+ debug: true # optional
+ output: "~/Documents/Manga"
+ fanfox:
+  - title: "black clover"
+    pdf: true
+    download_chapters: "243-"
+  - title: "one piece"
+    pdf: true
+    download_chapters: "974-"
+  - title: "vinland saga"
+    pdf: true
+    download_chapters: "100-"
+  - title: "ao no exorcist"
+    pdf: true
+    download_chapters: "75-"
