@@ -82,6 +82,7 @@ class ChapterArchiver(object):
         images = []
         for path in images_path:
             image = Image.open(path)
+            image.load()
             if image.mode == 'RGBA':
                 image = image.convert('RGB')
             images.append(image)
