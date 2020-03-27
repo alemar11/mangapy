@@ -119,7 +119,6 @@ def main_yaml(args: argparse.Namespace):
                 download.source = 'fanfox'
                 download.enable_debug_log = debug_log
                 download.output = output
-                #download.pdf = pdf
                 download.proxy = proxy
                 start_download(download)
         
@@ -128,7 +127,6 @@ def main_yaml(args: argparse.Namespace):
                 download.source = 'mangapark'
                 download.enable_debug_log = debug_log
                 download.output = output
-                download.pdf = pdf
                 download.proxy = proxy
                 start_download(download)
 
