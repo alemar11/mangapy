@@ -25,7 +25,7 @@ def test_fetch_manga():
         first_chapter_count += 1
         assert page.number is not None
         assert page.url is not None
-    assert first_chapter_count == 55, "The first chapter sould contain 55 pages"
+    assert first_chapter_count == 55, "The first chapter should contain 55 pages"
 
 
 @pytest.mark.filterwarnings('ignore::urllib3.exceptions.InsecureRequestWarning')
@@ -43,7 +43,7 @@ def test_fetch_manga_licensed():
         first_chapter_count += 1
         assert page.number is not None
         assert page.url is not None
-    assert first_chapter_count == 46, "The first chapter sould contain 46 pages"
+    assert first_chapter_count == 46, "The first chapter should contain 46 pages"
 
     lastChapter = manga.chapters[-1]
     assert lastChapter is not None
@@ -53,7 +53,7 @@ def test_fetch_manga_licensed():
         last_chapter_count += 1
         assert page.number is not None
         assert page.url is not None
-    assert last_chapter_count == 18, "The last chapter sould contain 18 pages"
+    assert last_chapter_count == 18, "The last chapter should contain 18 pages"
 
 
 @pytest.mark.filterwarnings('ignore::urllib3.exceptions.InsecureRequestWarning')
