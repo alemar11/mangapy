@@ -130,7 +130,7 @@ def main_yaml(args: argparse.Namespace):
                     download.output = output
                     download.proxy = proxy
                     start_download(download)
-    except Exception as error:            
+    except Exception as error:   
         print(error)
 
 

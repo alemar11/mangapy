@@ -1,0 +1,7 @@
+--- 
+ debug: true # optional
+ output: "~/Documents/MangaTest"
+ fanfox:
+   - title: "bleach"
+     pdf: true
+     download_chapters: "478-"
