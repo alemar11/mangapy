@@ -97,38 +97,41 @@ class MangaDownload:
 def main_yaml(args: argparse.Namespace):
     yaml_file = args.yaml_file.strip()
 
-    with open(yaml_file, 'r') as f:
-        dictionary = yaml.load(f, Loader=yaml.FullLoader)
-        output = dictionary['output']
+    try:
+        with open(yaml_file, 'r') as f:
+            dictionary = yaml.load(f, Loader=yaml.FullLoader)
+            output = dictionary['output']
 
-        proxy = None
-        if 'proxy' in dictionary.keys() and dictionary['proxy']:
-            proxy_info = dictionary['proxy']
-            if 'http' and 'https' in proxy_info.keys():
-                print('Setting proxy')
-                proxy = dictionary['proxy']
-            else:
-                print('The proxy is not in the right format and it will not be used.')
+            proxy = None
+            if 'proxy' in dictionary.keys() and dictionary['proxy']:
+                proxy_info = dictionary['proxy']
+                if 'http' and 'https' in proxy_info.keys():
+                    print('Setting proxy')
+                    proxy = dictionary['proxy']
+                else:
+                    print('The proxy is not in the right format and it will not be used.')
 
-        debug_log = False
-        if 'debug' in dictionary.keys() and dictionary['debug']:
-            debug_log = True
+            debug_log = False
+            if 'debug' in dictionary.keys() and dictionary['debug']:
+                debug_log = True
 
-        if 'fanfox' in dictionary.keys():
-            for download in list(map(lambda manga: MangaDownload(**manga), dictionary['fanfox'])):
-                download.source = 'fanfox'
-                download.enable_debug_log = debug_log
-                download.output = output
-                download.proxy = proxy
-                start_download(download)
-        
-        if 'mangapark' in dictionary.keys():
-            for download in list(map(lambda manga: MangaDownload(**manga), dictionary['mangapark'])):
-                download.source = 'mangapark'
-                download.enable_debug_log = debug_log
-                download.output = output
-                download.proxy = proxy
-                start_download(download)
+            if 'fanfox' in dictionary.keys():
+                for download in list(map(lambda manga: MangaDownload(**manga), dictionary['fanfox'])):
+                    download.source = 'fanfox'
+                    download.enable_debug_log = debug_log
+                    download.output = output
+                    download.proxy = proxy
+                    start_download(download)
+            
+            if 'mangapark' in dictionary.keys():
+                for download in list(map(lambda manga: MangaDownload(**manga), dictionary['mangapark'])):
+                    download.source = 'mangapark'
+                    download.enable_debug_log = debug_log
+                    download.output = output
+                    download.proxy = proxy
+                    start_download(download)
+    except Exception as error:            
+        print(error)
 
 
 def main_title(args: argparse.Namespace):
@@ -256,7 +259,7 @@ def start_download(download: MangaDownload):
 
 if __name__ == '__main__':
     main_folder = os.getcwd()
-    yaml_file = os.path.join(main_folder, 'sample2.yaml')
+    yaml_file = os.path.join(main_folder, 'sample3.yaml')
     sys.argv.insert(1, 'yaml')
     sys.argv.insert(2, yaml_file)
 

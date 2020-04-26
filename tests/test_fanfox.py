@@ -23,7 +23,7 @@ def test_fetch_manga():
         first_chapter_count += 1
         assert page.number is not None
         assert page.url is not None
-    assert first_chapter_count == 56, "The first chapter sould contain 56 pages"
+    assert first_chapter_count == 56, "The first chapter should contain 56 pages"
 
 
 @pytest.mark.skip(reason="It fails most of the time using Github Actions")
@@ -41,7 +41,7 @@ def test_fetch_manga_licensed():
         first_chapter_count += 1
         assert page.number is not None
         assert page.url is not None
-    assert first_chapter_count == 47, "The first chapter sould contain 47 pages"
+    assert first_chapter_count == 47, "The first chapter should contain 47 pages"
 
     lastChapter = manga.chapters[-1]
     assert lastChapter is not None
@@ -51,7 +51,7 @@ def test_fetch_manga_licensed():
         last_chapter_count += 1
         assert page.number is not None
         assert page.url is not None
-    assert last_chapter_count == 46, "The last chapter sould contain 46 pages"
+    assert last_chapter_count == 46, "The last chapter should contain 46 pages"
 
 
 def test_fetch_adult_content():
