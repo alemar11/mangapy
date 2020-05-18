@@ -43,6 +43,25 @@ class FanFoxRepository(MangaRepository):
         self._session.proxies = self.proxies
         return self._session
 
+    def _get_chapters(self, list):
+        manga_chapters = []
+        if list is None:
+            return manga_chapters            
+        list_detail = list.find('ul', {'class': 'detail-main-list'})
+        if list_detail is None:
+            return manga_chapters
+        chapters = list_detail.findAll('a', href=True)
+        chapters_url = map(lambda c: c['href'], reversed(chapters))
+         
+        for url in chapters_url:
+            number = url.split("/")[-2][1:]  # relative url, todo: regex
+            absolute_url = "{0}{1}".format(self.base_url, url)
+            number = float(number)
+            chapter = FanFoxChapter(absolute_url, number, self.session)
+            manga_chapters.append(chapter)
+
+        return manga_chapters
+
     def search(self, manga_name) -> [Manga]:
         # support alphanumeric names with multiple words
         manga_name_adjusted = re.sub(r'[^A-Za-z0-9]+', '_', re.sub(r'^[^A-Za-z0-9]+|[^A-Za-z0-9]+$', '', manga_name)).lower()
@@ -56,10 +75,13 @@ class FanFoxRepository(MangaRepository):
         soup = BeautifulSoup(content, features="html.parser")
 
         # list-2 contains all the chapters, list-1 only the last volume
-        # we use list-1 only if the list-2 doesn't exists
-        all_chapters = soup.find('div', {'id': 'list-2'}) or soup.find('div', {'id': 'list-1'})
+        # in theory we should use list-1 and fallback to to list-2 if list-1 doesn't exist
+        # but it seems that sometimes chapters are put in the wrong list
+        # to solve this we merge both the lists
+        list_two = soup.find('div', {'id': 'list-2'})
+        list_one = soup.find('div', {'id': 'list-1'})
 
-        if all_chapters is None:
+        if list_one is None and list_two is None:
             blocked = soup.find('p', {'class': 'detail-block-content'})
             if blocked:
                 log.warning(blocked.getText())
@@ -67,24 +89,23 @@ class FanFoxRepository(MangaRepository):
                 log.warning('No chapters found')
             return None
 
-        chapters_detail = all_chapters.find('ul', {'class': 'detail-main-list'})
+        list_one_chapters = self._get_chapters(list_one)
+        list_two_chapters = self._get_chapters(list_two)
+        chapters = list_one_chapters + list_two_chapters
 
-        if chapters_detail is None:
+        if not chapters:
             log.warning('No chapters list found')
             return None
 
-        chapters = chapters_detail.findAll('a', href=True)
-        chapters_url = map(lambda c: c['href'], reversed(chapters))
-        manga_chapters = []
+        seen = set()
+        unique_chapters = []
+        for chapter in chapters:
+            if chapter.number not in seen:
+                unique_chapters.append(chapter)
+                seen.add(chapter.number)
+               
+        sorted_chapters = sorted(unique_chapters, key=lambda chapter: chapter.number, reverse=False)
 
-        for url in chapters_url:
-            number = url.split("/")[-2][1:]  # relative url, todo: regex
-            absolute_url = "{0}{1}".format(self.base_url, url)
-            number = float(number)
-            chapter = FanFoxChapter(absolute_url, number, self.session)
-            manga_chapters.append(chapter)
-
-        sorted_chapters = sorted(manga_chapters, key=lambda chapter: chapter.number, reverse=False)
         manga = Manga(manga_name, sorted_chapters)
         return manga
 
