@@ -46,6 +46,7 @@ class MangaParkRepository(MangaRepository):
         text = response.text
         soup = BeautifulSoup(text, "html.parser")
 
+        # this algorithm searches for the most updated stream, not for the one with more chapters
         # 1 fox
         # 3 panda
         # 6 rock
