@@ -26,7 +26,7 @@ def test_fetch_manga():
     assert first_chapter_count == 56, "The first chapter should contain 56 pages"
 
 
-@pytest.mark.skip(reason="It fails most of the time using Github Actions")
+#@pytest.mark.skip(reason="It fails most of the time using Github Actions")
 def test_fetch_manga_licensed():
     repository = FanFoxRepository()
     # repository.proxies = proxies
