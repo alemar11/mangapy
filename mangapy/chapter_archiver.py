@@ -24,7 +24,8 @@ class ChapterArchiver(object):
         else:
             images_path = self.path.joinpath('images')
 
-        chapter_name = str(int(chapter.number)) if chapter.number.is_integer() else str(chapter.number)
+        isChapterNumberInt = isinstance(chapter.number, int) or chapter.number.is_integer()
+        chapter_name = str(int(chapter.number)) if isChapterNumberInt else str(chapter.number)
         chapter_images_path = images_path.joinpath(str(chapter.number))
         chapter_images_path.mkdir(parents=True, exist_ok=True)
         pages = chapter.pages()
