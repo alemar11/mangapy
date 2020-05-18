@@ -264,13 +264,12 @@ if __name__ == '__main__':
     sys.argv.insert(2, yaml_file)
 
     # sys.argv.insert(1, 'title')
-    # sys.argv.insert(2, 'bleach')
+    # sys.argv.insert(2, 'jujutsu kaisen')
     # sys.argv.insert(3, '-o ~/Downloads/mangapy_test')
-    # #sys.argv.insert(4, '-c 11-12')
-    # sys.argv.insert(4, '-c 428.1')
-    # #sys.argv.insert(5, '-s mangapark')
+    # sys.argv.insert(4, '-c 1-100')
+    # sys.argv.insert(5, '-s mangapark')
     # sys.argv.insert(6, '--pdf')
-    # #sys.argv.insert(7, '--debug')
-    # #sys.argv.insert(7, '-p {"http": "http://31.14.131.70:8080", "https": "http://31.14.131.70:8080"}')
+    # sys.argv.insert(7, '--debug')
+    # sys.argv.insert(8, '-p {"http": "http://31.14.131.70:8080", "https": "http://31.14.131.70:8080"}')
 
     main()
