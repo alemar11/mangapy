@@ -1,7 +1,5 @@
 # mangapy
 
-![Python package](https://github.com/alemar11/mangapy/workflows/Python%20package/badge.svg?branch=master)
-
 Manga downloader supporting the following sources:
 
 - fanfox.net
