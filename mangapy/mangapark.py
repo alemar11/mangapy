@@ -46,7 +46,8 @@ class MangaParkRepository(MangaRepository):
         text = response.text
         soup = BeautifulSoup(text, "html.parser")
 
-        # this algorithm searches for the most updated stream, not for the one with more chapters
+        # this algorithm searches for the most updated stream and for the most content rich stream
+        # if the 2 found streams are different, the two streams chapters will be merged
         # 1 fox
         # 3 panda
         # 6 rock
@@ -69,17 +70,40 @@ class MangaParkRepository(MangaRepository):
             return None
 
         last_chapter_number = -1
-        most_updated_stream = None
+        most_recenly_updated_stream = None
+        number_of_chapters = -1
+        most_rich_content_stream = None
 
         for stream, chapters in contents.items():
             max_chapter_number = max(chapter.number for chapter in chapters)
             if max_chapter_number is not None and max_chapter_number > last_chapter_number:
                 last_chapter_number = max_chapter_number
                 manga_chapters = chapters
-                most_updated_stream = stream
+                most_recenly_updated_stream = stream
+            if most_rich_content_stream is not None:
+                if len(chapters) > number_of_chapters:
+                    number_of_chapters = len(chapters)
+                    most_rich_content_stream = stream
+            else:
+                number_of_chapters = len(chapters)
+                most_rich_content_stream = stream
 
-        manga_chapters = contents[most_updated_stream]
-        log.info('using {0} (last chapter: {1})'.format(most_updated_stream, str(last_chapter_number)))
+        if most_recenly_updated_stream == most_rich_content_stream:
+            log.info('using {0}'.format(most_recenly_updated_stream))
+            manga_chapters = contents[most_recenly_updated_stream]
+        else:
+            # at this point we have 2 sources: one with the latest chapter and another one with probably the entire chapter list
+            log.info('using {0} and {1}'.format(most_recenly_updated_stream, most_rich_content_stream))
+            available_chapters = contents[most_recenly_updated_stream] + contents[most_rich_content_stream]
+            seen = set()
+            manga_chapters = []
+            for chapter in available_chapters:
+                if chapter.number not in seen:
+                    manga_chapters.append(chapter)
+                    seen.add(chapter.number)
+               
+            manga_chapters = sorted(manga_chapters, key=lambda chapter: chapter.number, reverse=False)
+
         manga = Manga(title, manga_chapters)
         return manga
 
