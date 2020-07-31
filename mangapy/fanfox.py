@@ -165,7 +165,7 @@ class FanFoxChapter(Chapter):
 
         links = []
         for i in range(0, int(last_page_number / 2 + .5)):
-            data = self._one_link_helper(soup.text, (i * 2) + 1, base_url)
+            data = self._one_link_helper(content, (i * 2) + 1, base_url)
             links += self._parse_links(self._get_urls(data))
 
         pages = []
