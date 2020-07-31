@@ -1,7 +1,7 @@
 --- 
  debug: true # optional
- output: "~/Documents/MangaTest"
+ output: "~/Downloads/MangaTest"
  fanfox:
-   - title: "bleach"
+   - title: "Ahiru no Sora"
      pdf: true
-     download_chapters: "478-"
+     download_chapters: "152.3-"

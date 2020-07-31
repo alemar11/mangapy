@@ -79,16 +79,16 @@ class MangaDownload:
             return self.__dict__['download_all_chapters']
         return False
 
-    def download_range(self) -> (int, int):
+    def download_range(self) -> (float, float):
         if 'download_chapters' in self.__dict__.keys():
             chapters = self.__dict__['download_chapters']
             chapters = chapters.split('-')
             begin = None
             end = None
             if len(chapters) == 2:
-                begin = int(chapters[0])
-                end = int(chapters[1]) if chapters[1] else None
-            if begin and end and (int(begin) > int(end)):
+                begin = float(chapters[0])
+                end = float(chapters[1]) if chapters[1] else None
+            if begin and end and (float(begin) > float(end)):
                 sys.exit('{0}: error: invalid chapter interval, the end should be bigger than start'.format(chapters))
             return begin, end
         return None
