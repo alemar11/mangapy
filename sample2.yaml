@@ -1,6 +1,6 @@
 --- 
  debug: true # optional
- output: "~/Documents/Manga"
+ output: "~/Downloads/Mangapy_sample2"
  fanfox:
   - title: "black clover"
     pdf: true
