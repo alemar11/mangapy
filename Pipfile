@@ -18,6 +18,7 @@ mangapy = {editable = true,path = "."}
 pillow = ">=7.1.0"
 pytest = "*"
 tqdm = "*"
+pip = "*"
 
 [requires]
 python_version = "3.7"
