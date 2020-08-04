@@ -47,7 +47,7 @@ class ChapterArchiver(object):
             pdf_path.mkdir(parents=True, exist_ok=True)
             chapter_pdf_file_path = pdf_path.joinpath(chapter_name + '.pdf')
             self._create_chapter_pdf(chapter_images_path, chapter_pdf_file_path)
-            shutil.rmtree(chapter_images_path)
+            shutil.rmtree(chapter_images_path, ignore_errors=True)
 
     def _fetch_image(self, url: str):
         response = self.session.get(url, verify=False)
