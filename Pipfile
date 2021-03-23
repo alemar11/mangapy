@@ -6,7 +6,6 @@ verify_ssl = true
 [dev-packages]
 flake8 = "*"
 pylint = "*"
-v = {editable = true,version = "*"}
 pytest = "*"
 rope = "*"
 mangapy = {editable = true,path = "."}
@@ -14,11 +13,11 @@ mangapy = {editable = true,path = "."}
 [packages]
 bs4 = "*"
 requests = "*"
-mangapy = {editable = true,path = "."}
+mangapy = {editable = true, path = "."}
 pillow = ">=7.1.0"
 pytest = "*"
 tqdm = "*"
 pip = "*"
 
 [requires]
-python_version = "3.7"
+python_version = "3.9"

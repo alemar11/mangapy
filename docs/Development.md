@@ -6,7 +6,7 @@ settings.json
 
 ```json
 {
-    "python.pythonPath": "/Users/amarzoli/.local/share/virtualenvs/manga-S-NqUtI-/bin/python",
+    "python.pythonPath": "/Users/amarzoli/.local/share/virtualenvs/mangapy-SS8vXwx4/bin/python",
     "python.linting.enabled": true,
     "python.linting.pylintEnabled": false,
     "python.linting.flake8Enabled": true,
