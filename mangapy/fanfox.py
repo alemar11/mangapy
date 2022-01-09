@@ -46,7 +46,7 @@ class FanFoxRepository(MangaRepository):
     def _get_chapters(self, list):
         manga_chapters = []
         if list is None:
-            return manga_chapters            
+            return manga_chapters
         list_detail = list.find('ul', {'class': 'detail-main-list'})
         if list_detail is None:
             return manga_chapters
@@ -160,7 +160,12 @@ class FanFoxChapter(Chapter):
         content = response.text
         soup = BeautifulSoup(content, features="html.parser")
         page_numbers = soup.findAll("a", {"data-page": True})
+
+        if not len(page_numbers):
+            return []
+
         page_numbers = map(lambda x: int(x['data-page']), page_numbers)
+
         last_page_number = max(page_numbers)
 
         links = []

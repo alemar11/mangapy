@@ -29,6 +29,10 @@ class ChapterArchiver(object):
         chapter_images_path = images_path.joinpath(str(chapter.number))
         chapter_images_path.mkdir(parents=True, exist_ok=True)
         pages = chapter.pages()
+        if pages is None or not len(pages):
+            print("🆘  {0} doesn't have any pages and it will be skipped.".format(chapter_name))
+            return
+
         description = ('Chapter {0}'.format(chapter_name))
         func = partial(self._save_image, chapter_images_path)  # currying
 
