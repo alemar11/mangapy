@@ -6,7 +6,6 @@ settings.json
 
 ```json
 {
-    "python.pythonPath": "/Users/amarzoli/.local/share/virtualenvs/mangapy-SS8vXwx4/bin/python",
     "python.linting.enabled": true,
     "python.linting.pylintEnabled": false,
     "python.linting.flake8Enabled": true,
@@ -22,7 +21,10 @@ settings.json
 }
 ```
 
-To configure pythonPath when using pipenv run: `pipenv --venv`
+For users that want to set a default interpreter for a workspace, you can use the new setting `python.defaultInterpreterPath`. 
+i.e. `"python.defaultInterpreterPath": "/Users/amarzoli/.local/share/virtualenvs/mangapy-SS8vXwx4/bin/python"`
+
+To configure `defaultInterpreterPath` when using pipenv run: `pipenv --venv`
 
 
 ## Installation
