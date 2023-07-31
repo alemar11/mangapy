@@ -14,7 +14,7 @@ mangapy = {editable = true,path = "."}
 bs4 = "*"
 requests = "*"
 mangapy = {editable = true, path = "."}
-pillow = "~=9.0.1"
+pillow = "*"
 pytest = "*"
 tqdm = "*"
 pip = "*"
