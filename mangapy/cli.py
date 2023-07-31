@@ -5,12 +5,11 @@ import logging
 import os
 import pkg_resources
 import sys
-from mangapy.mangapark import MangaParkRepository
 from mangapy.fanfox import FanFoxRepository
 from mangapy.chapter_archiver import ChapterArchiver
 from mangapy import log
 from pathlib import Path
-
+from typing import Tuple
 
 version = pkg_resources.require("mangapy")[0].version
 default_path_to_download_folder = str(os.path.join(Path.home(), "Downloads", "mangapy"))
@@ -37,7 +36,7 @@ def cmd_parse():
     group = args_parser.add_mutually_exclusive_group()
     group.add_argument('-a', '--all', action='store_true', help="download all chapters available")
     group.add_argument('-c', '--chapter', type=str, help="chapter(s) number to download")
-    
+
     parser.add_argument('-v', '--version',
                         action='version',
                         version='{0} {1}'.format(parser.prog, version),
@@ -79,7 +78,7 @@ class MangaDownload:
             return self.__dict__['download_all_chapters']
         return False
 
-    def download_range(self) -> (float, float):
+    def download_range(self) -> Tuple[float, float]:
         if 'download_chapters' in self.__dict__.keys():
             chapters = self.__dict__['download_chapters']
             chapters = chapters.split('-')
@@ -122,15 +121,7 @@ def main_yaml(args: argparse.Namespace):
                     download.output = output
                     download.proxy = proxy
                     start_download(download)
-            
-            if 'mangapark' in dictionary.keys():
-                for download in list(map(lambda manga: MangaDownload(**manga), dictionary['mangapark'])):
-                    download.source = 'mangapark'
-                    download.enable_debug_log = debug_log
-                    download.output = output
-                    download.proxy = proxy
-                    start_download(download)
-    except Exception as error:   
+    except Exception as error:
         print(error)
 
 
@@ -158,7 +149,7 @@ def main_title(args: argparse.Namespace):
             download.proxy = args.proxy
         else:
             print('The proxy is not in the right format and it will not be used.')
-            
+
     if args.all:
         download.download_all_chapters = True
 
@@ -180,9 +171,12 @@ def start_download(download: MangaDownload):
     else:
         log.setLevel(logging.ERROR)
 
+    headers = None
+
     if download.source is None:
         repository = FanFoxRepository()
         repository_directory = 'fanfox'
+        headers = {"Referer": "http://fanfox.net/"}
         max_workers = 1  # to avoid bot detection
     else:
         source = download.source.strip().lower()
@@ -190,12 +184,9 @@ def start_download(download: MangaDownload):
             repository = FanFoxRepository()
             repository_directory = source
             max_workers = 1  # to avoid bot detection
-        elif source == 'mangapark':
-            repository = MangaParkRepository()
-            repository_directory = source
-            max_workers = 5
+            headers = {"Referer": "{0}".format(repository.base_url)}
         else:
-            sys.exit('source is missing')
+            sys.exit('Source {0} is missing'.format(source))
 
     if download.proxy:
         repository.proxies = download.proxy
@@ -241,7 +232,7 @@ def start_download(download: MangaDownload):
                 stop = index + 1
         for chapter in manga.chapters[start:stop]:
             chapters.append(chapter)
- 
+
     else:  # manga._download_last()
         last_chapter = manga.last_chapter
         chapters.append(last_chapter)
@@ -250,7 +241,7 @@ def start_download(download: MangaDownload):
     archiver = ChapterArchiver(directory, max_workers=max_workers)
     for chapter in chapters:
         try:
-            archiver.archive(chapter, download.save_as_pdf())
+            archiver.archive(chapter, download.save_as_pdf(), headers)
         except Exception as e:
             logging.error(str(e))
 
@@ -267,7 +258,7 @@ if __name__ == '__main__':
     # sys.argv.insert(2, 'jujutsu kaisen')
     # sys.argv.insert(3, '-o ~/Downloads/mangapy_test')
     # sys.argv.insert(4, '-c 1-100')
-    # sys.argv.insert(5, '-s mangapark')
+    # sys.argv.insert(5, '-s fanfox')
     # sys.argv.insert(6, '--pdf')
     # sys.argv.insert(7, '--debug')
     # sys.argv.insert(8, '-p {"http": "http://31.14.131.70:8080", "https": "http://31.14.131.70:8080"}')

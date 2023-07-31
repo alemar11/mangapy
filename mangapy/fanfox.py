@@ -3,6 +3,7 @@ import requests
 from mangapy import log
 from mangapy.mangarepository import MangaRepository, Manga, Chapter, Page
 from bs4 import BeautifulSoup
+from typing import List
 
 
 def unpack(p, a, c, k, e=None, d=None):
@@ -34,7 +35,7 @@ class FanFoxRepository(MangaRepository):
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) '
                           'Chrome/60.0.3112.101 Safari/537.36',
             'Accept-Language': 'ru-RU,ru;q=0.8,en-US;q=0.5,en;q=0.3',
-            'Referer': 'http://fanfox.net',
+            'Referer': '{0}'.format(self.base_url),
             'Connection': 'keep-alive'
         }
 
@@ -62,7 +63,7 @@ class FanFoxRepository(MangaRepository):
 
         return manga_chapters
 
-    def search(self, manga_name) -> [Manga]:
+    def search(self, manga_name) -> List[Manga]:
         # support alphanumeric names with multiple words
         manga_name_adjusted = re.sub(r'[^A-Za-z0-9]+', '_', re.sub(r'^[^A-Za-z0-9]+|[^A-Za-z0-9]+$', '', manga_name)).lower()
         manga_url = "{0}/manga/{1}".format(self.base_url, manga_name_adjusted)
@@ -150,7 +151,7 @@ class FanFoxChapter(Chapter):
         images = re.findall(r'"(/\w.+?)"', data)
         return [base_path + i for i in images]
 
-    def pages(self) -> [Page]:
+    def pages(self) -> List[Page]:
         base_url = self.first_page_url[:self.first_page_url.rfind('/')]
         response = self.session.get(self.first_page_url)
 

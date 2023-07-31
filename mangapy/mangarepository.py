@@ -1,22 +1,7 @@
 
 import re
 from abc import ABC, abstractmethod
-
-
-class Manga(ABC):
-    def __init__(self, title, chapters):
-        self.title = title
-        self.chapters = chapters
-
-    @property
-    def last_chapter(self):
-        # latest chapter available
-        return self.chapters[-1]
-
-    @property
-    def subdirectory(self):
-        # subdirectory where chapters should be saved
-        return re.sub(r'[^A-Za-z0-9]+', '_', re.sub(r'^[^A-Za-z0-9]+|[^A-Za-z0-9]+$', '', self.title)).lower()
+from typing import List
 
 
 class Page():
@@ -31,13 +16,29 @@ class Chapter(ABC):
         self.number = number
 
     @abstractmethod
-    def pages(self) -> [Page]:
+    def pages(self) -> List[Page]:
         pass
+
+
+class Manga(ABC):
+    def __init__(self, title, chapters: List[Chapter]):
+        self.title = title
+        self.chapters = chapters
+
+    @property
+    def last_chapter(self):
+        # latest chapter available
+        return self.chapters[-1]
+
+    @property
+    def subdirectory(self):
+        # subdirectory where chapters should be saved
+        return re.sub(r'[^A-Za-z0-9]+', '_', re.sub(r'^[^A-Za-z0-9]+|[^A-Za-z0-9]+$', '', self.title)).lower()
 
 
 class MangaRepository(ABC):
     base_url = None
 
     @abstractmethod
-    def search(self, title) -> [Manga]:
+    def search(self, title) -> List[Manga]:
         pass

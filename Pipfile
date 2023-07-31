@@ -13,11 +13,12 @@ mangapy = {editable = true,path = "."}
 [packages]
 bs4 = "*"
 requests = "*"
-mangapy = {editable = true, path = "."}
-pillow = "~=9.0.1"
+pillow = "*"
 pytest = "*"
 tqdm = "*"
 pip = "*"
+pyyaml = "*"
+mangapy = {editable = true, path = "."}
 
 [requires]
-python_version = "3.9"
+python_version = "3.11"
