@@ -180,9 +180,12 @@ def start_download(download: MangaDownload):
     else:
         log.setLevel(logging.ERROR)
 
+    headers = None
+
     if download.source is None:
         repository = FanFoxRepository()
         repository_directory = 'fanfox'
+        headers = {"Referer": "http://fanfox.net/"}
         max_workers = 1  # to avoid bot detection
     else:
         source = download.source.strip().lower()
@@ -190,12 +193,13 @@ def start_download(download: MangaDownload):
             repository = FanFoxRepository()
             repository_directory = source
             max_workers = 1  # to avoid bot detection
+            headers = {"Referer": "http://fanfox.net/"}
         elif source == 'mangapark':
             repository = MangaParkRepository()
             repository_directory = source
             max_workers = 5
         else:
-            sys.exit('source is missing')
+            sys.exit('Source {0} is missing'.format(source))
 
     if download.proxy:
         repository.proxies = download.proxy
@@ -250,7 +254,7 @@ def start_download(download: MangaDownload):
     archiver = ChapterArchiver(directory, max_workers=max_workers)
     for chapter in chapters:
         try:
-            archiver.archive(chapter, download.save_as_pdf(), {"Referer": "http://fanfox.net/"})
+            archiver.archive(chapter, download.save_as_pdf(), headers)
         except Exception as e:
             logging.error(str(e))
 
