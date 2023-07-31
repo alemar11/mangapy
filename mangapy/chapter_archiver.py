@@ -1,7 +1,9 @@
+import logging
 import os
 import re
 import requests
 import shutil
+from collections.abc import Mapping
 from functools import partial
 from tqdm import tqdm
 from PIL import Image
@@ -18,14 +20,14 @@ class ChapterArchiver(object):
         self.max_workers = max_workers
         self.path = Path(path).expanduser()
 
-    def archive(self, chapter: Chapter, pdf: bool):
+    def archive(self, chapter: Chapter, pdf: bool, headers: Mapping[str, str | bytes | None] | None):
         if pdf:
             images_path = self.path.joinpath('.images')
         else:
             images_path = self.path.joinpath('images')
 
-        isChapterNumberInt = isinstance(chapter.number, int) or chapter.number.is_integer()
-        chapter_name = str(int(chapter.number)) if isChapterNumberInt else str(chapter.number)
+        isChapterNumberAnInt = isinstance(chapter.number, int) or chapter.number.is_integer()
+        chapter_name = str(int(chapter.number)) if isChapterNumberAnInt else str(chapter.number)
         chapter_images_path = images_path.joinpath(str(chapter.number))
         chapter_images_path.mkdir(parents=True, exist_ok=True)
         pages = chapter.pages()
@@ -34,7 +36,7 @@ class ChapterArchiver(object):
             return
 
         description = ('Chapter {0}'.format(chapter_name))
-        func = partial(self._save_image, chapter_images_path)  # currying
+        func = partial(self._save_image, chapter_images_path, headers)  # currying
 
         if pdf:
             pdf_path = self.path.joinpath('pdf')
@@ -53,13 +55,13 @@ class ChapterArchiver(object):
             self._create_chapter_pdf(chapter_images_path, chapter_pdf_file_path)
             shutil.rmtree(chapter_images_path, ignore_errors=True)
 
-    def _fetch_image(self, url: str):
-        response = self.session.get(url, verify=False)
+    def _fetch_image(self, url: str, headers: Mapping[str, str | bytes | None] | None):
+        response = self.session.get(url, verify=False, headers=headers)
         if response.status_code != 200:
             return None
         return response.content
 
-    def _save_image(self, image_path: Path, page: Page):
+    def _save_image(self, image_path: Path, headers: Mapping[str, str | bytes | None] | None, page: Page):
         file_name = str(page.number)
         image_url = page.url
         file_ext = urlparse(image_url).path.split('.')[-1]
@@ -70,9 +72,10 @@ class ChapterArchiver(object):
         if image_url.startswith('//'):
             image_url = 'http:' + image_url
 
-        data = self._fetch_image(image_url)
+        data = self._fetch_image(image_url, headers=headers)
 
         if data is None:
+            logging.error("Can't download page {0}".format(file_name))
             return
 
         output = open(file_path, "wb")

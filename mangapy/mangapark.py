@@ -5,6 +5,7 @@ import urllib3
 from mangapy import log
 from mangapy.mangarepository import MangaRepository, Manga, Chapter, Page
 from bs4 import BeautifulSoup
+from typing import List
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -36,7 +37,7 @@ class MangaParkRepository(MangaRepository):
         self._session.proxies = self.proxies
         return self._session
 
-    def search(self, title) -> [Manga]:
+    def search(self, title) -> List[Manga]:
         manga_name_adjusted = re.sub(r'[^A-Za-z0-9]+', '-', re.sub(r'^[^A-Za-z0-9]+|[^A-Za-z0-9]+$', '', title)).lower()
         manga_url = "{0}/manga/{1}".format(self.base_url, manga_name_adjusted)
         response = self.session.get(url=manga_url, verify=False)
