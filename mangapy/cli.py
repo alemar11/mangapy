@@ -5,7 +5,6 @@ import logging
 import os
 import pkg_resources
 import sys
-from mangapy.mangapark import MangaParkRepository
 from mangapy.fanfox import FanFoxRepository
 from mangapy.chapter_archiver import ChapterArchiver
 from mangapy import log
@@ -122,14 +121,6 @@ def main_yaml(args: argparse.Namespace):
                     download.output = output
                     download.proxy = proxy
                     start_download(download)
-
-            if 'mangapark' in dictionary.keys():
-                for download in list(map(lambda manga: MangaDownload(**manga), dictionary['mangapark'])):
-                    download.source = 'mangapark'
-                    download.enable_debug_log = debug_log
-                    download.output = output
-                    download.proxy = proxy
-                    start_download(download)
     except Exception as error:
         print(error)
 
@@ -193,11 +184,7 @@ def start_download(download: MangaDownload):
             repository = FanFoxRepository()
             repository_directory = source
             max_workers = 1  # to avoid bot detection
-            headers = {"Referer": "http://fanfox.net/"}
-        elif source == 'mangapark':
-            repository = MangaParkRepository()
-            repository_directory = source
-            max_workers = 5
+            headers = {"Referer": "{0}".format(repository.base_url)}
         else:
             sys.exit('Source {0} is missing'.format(source))
 
@@ -271,7 +258,7 @@ if __name__ == '__main__':
     # sys.argv.insert(2, 'jujutsu kaisen')
     # sys.argv.insert(3, '-o ~/Downloads/mangapy_test')
     # sys.argv.insert(4, '-c 1-100')
-    # sys.argv.insert(5, '-s mangapark')
+    # sys.argv.insert(5, '-s fanfox')
     # sys.argv.insert(6, '--pdf')
     # sys.argv.insert(7, '--debug')
     # sys.argv.insert(8, '-p {"http": "http://31.14.131.70:8080", "https": "http://31.14.131.70:8080"}')
