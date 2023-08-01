@@ -7,7 +7,7 @@ from typing import List
 
 
 def unpack(p, a, c, k, e=None, d=None):
-    def baseN(num, b, numerals="0123456789abcdefghijklmnopqrstuvwxyz"):
+    def baseN(num, b, numerals="0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"):
         return ((num == 0) and numerals[0]) or (baseN(num // b, b, numerals).lstrip(numerals[0]) + numerals[num % b])
 
     while (c):
@@ -162,21 +162,31 @@ class FanFoxChapter(Chapter):
         soup = BeautifulSoup(content, features="html.parser")
         page_numbers = soup.findAll("a", {"data-page": True})
 
-        if not len(page_numbers):
-            return []
-
-        page_numbers = map(lambda x: int(x['data-page']), page_numbers)
-
-        last_page_number = max(page_numbers)
-
         links = []
-        for i in range(0, int(last_page_number / 2 + .5)):
-            data = self._one_link_helper(content, (i * 2) + 1, base_url)
-            links += self._parse_links(self._get_urls(data))
-
         pages = []
-        for i, link in enumerate(links):
-            pages.append(Page(i, link))
+
+        if not len(page_numbers):
+            # sometimes all the images are loaded in the same html page
+            scripts = soup.find_all("script", {"type": "text/javascript"})
+            if not scripts:
+                return []
+            eval_script = next((script for script in scripts if script.text.startswith("eval")), None).text
+            images_content = self._get_urls(eval_script)
+            links = re.search(r'(?<=newImgs=\[)[^]]+(?=\])', images_content).group(0).split(',')
+            for i, link in enumerate(links):
+                formatted_link = link.replace("'", "")
+                pages.append(Page(i, formatted_link))
+        else:
+            # standard flow
+            page_numbers = map(lambda x: int(x['data-page']), page_numbers)
+            last_page_number = max(page_numbers)
+
+            for i in range(0, int(last_page_number / 2 + .5)):
+                data = self._one_link_helper(content, (i * 2) + 1, base_url)
+                links += self._parse_links(self._get_urls(data))
+        
+            for i, link in enumerate(links):
+                pages.append(Page(i, link))
 
         return pages
 

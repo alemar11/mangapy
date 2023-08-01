@@ -10,6 +10,23 @@ def test_fetch_not_existing_manga():
     assert manga is None
 
 
+def test_fetch_manga_chapter_where_all_the_images_are_in_the_same_page():
+    repository = FanFoxRepository()
+    manga = repository.search('ahiru no sora')
+    assert manga is not None
+    assert len(manga.chapters) >= 165, "It should contain at least 165 chapters (expected more)"
+    chapter = next((chapter for chapter in manga.chapters if chapter.number == 164.0), None)
+    assert chapter is not None
+    print(chapter.number)
+    pages = chapter.pages()
+    chapter_count = 0
+    for page in pages:
+        chapter_count += 1
+        assert page.number is not None
+        assert page.url is not None
+    assert chapter_count == 18, "The chapter should contain 18 pages"
+
+
 def test_fetch_manga():
     repository = FanFoxRepository()
     manga = repository.search('kimetsu no yaiba')
