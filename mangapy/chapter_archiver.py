@@ -42,7 +42,7 @@ class ChapterArchiver(object):
             pdf_path = self.path.joinpath('pdf')
             chapter_pdf_file_path = pdf_path.joinpath(chapter_name + '.pdf')
             if os.path.isfile(chapter_pdf_file_path):
-                print("⏺  {0} already downloaded and it will skipped.".format(chapter_name))
+                print("⏺  {0} already downloaded and it will be skipped.".format(chapter_name))
                 return  # early exit if the file is already on disk
 
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
