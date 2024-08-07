@@ -1,15 +1,15 @@
 ## Generating distribution packages:
 
-1. Make sure you have the latest versions of **setuptools** and **wheel** installed:  
+1. Make sure you have the latest version of **build** installed:  
 
 ```
-python3 -m pip install --upgrade setuptools wheel
+python3 -m pip install --upgrade build
 ```
 
 2. Now run this command from the same directory where setup.py is located:  
 
 ```
-python3 setup.py sdist bdist_wheel
+python3 -m build
 ```
 
 ## Uploading the distribution archives:
@@ -23,5 +23,5 @@ python3 -m pip install --upgrade twine
 2. Run **Twine** to upload all of the archives under dist:  
 
 ```
-python3 -m twine upload --repository-url https://upload.pypi.org/legacy/ dist/*
+python3 -m twine upload dist/*
 ```
