@@ -18,7 +18,7 @@ pytest = "*"
 tqdm = "*"
 pip = "*"
 pyyaml = "*"
-mangapy = {editable = true, path = "."}
+mangapy = {file = ".", editable = true}
 
 [requires]
 python_version = "3.11"
