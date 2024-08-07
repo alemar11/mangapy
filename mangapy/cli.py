@@ -3,7 +3,7 @@ import yaml
 import json
 import logging
 import os
-import pkg_resources
+import importlib.metadata
 import sys
 from mangapy.fanfox import FanFoxRepository
 from mangapy.chapter_archiver import ChapterArchiver
@@ -11,7 +11,7 @@ from mangapy import log
 from pathlib import Path
 from typing import Tuple
 
-version = pkg_resources.require("mangapy")[0].version
+version = importlib.metadata.version('mangapy')
 default_path_to_download_folder = str(os.path.join(Path.home(), "Downloads", "mangapy"))
 
 
