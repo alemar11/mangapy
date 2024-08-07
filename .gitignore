@@ -131,6 +131,3 @@ dmypy.json
 
 # Vscode
 .vscode/settings.json
-
-# Custom
-.pypirc
