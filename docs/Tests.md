@@ -11,3 +11,7 @@ Run tests defined in a specific test and stopping them once the first failure oc
 ```
 pipenv run pytest tests/test_fanfox.py -x
 ```
+
+## Linting
+
+Install Flake8 VS Code extension
