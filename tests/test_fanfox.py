@@ -43,6 +43,23 @@ def test_fetch_manga():
     assert first_chapter_count == 56, "The first chapter should contain 56 pages"
 
 
+def test_fetch_manga_with_missing_extra_chapters():
+    # Chapters numbered "87.E" and "87.Extra" that gets skipped by the engine
+    repository = FanFoxRepository()
+    manga = repository.search('tower of god')
+    assert manga is not None
+    assert len(manga.chapters) >= 600, "It should contain more than chapters"
+    chapter = manga.chapters[87]
+    assert chapter is not None
+    pages = chapter.pages()
+    chapter_count = 0
+    for page in pages:
+        chapter_count += 1
+        assert page.number is not None
+        assert page.url is not None
+    assert chapter_count == 31, "The chapter should contain 31 pages"
+
+
 # @pytest.mark.skip(reason="It fails most of the time using Github Actions")
 def test_fetch_manga_licensed():
     repository = FanFoxRepository()

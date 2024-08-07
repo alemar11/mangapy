@@ -13,8 +13,16 @@ def unpack(p, a, c, k, e=None, d=None):
     while (c):
         c -= 1
         if (k[c]):
-            p = re.sub("\\b" + baseN(c, a) + "\\b",  k[c], p)
+            p = re.sub("\\b" + baseN(c, a) + "\\b", k[c], p)
     return p
+
+
+def can_convert_to_float(value):
+    try:
+        float(value)
+        return True
+    except ValueError:
+        return False
 
 
 class FanFoxRepository(MangaRepository):
@@ -55,11 +63,22 @@ class FanFoxRepository(MangaRepository):
         chapters_url = map(lambda c: c['href'], reversed(chapters))
          
         for url in chapters_url:
-            number = url.split("/")[-2][1:]  # relative url, todo: regex
+            number = url.split("/")[-2][1:]  # relative url, TODO: regex
             absolute_url = "{0}{1}".format(self.base_url, url)
-            number = float(number)
-            chapter = FanFoxChapter(absolute_url, number, self.session)
-            manga_chapters.append(chapter)
+
+            # if number is not convertible than chapters can be properly ordered
+            # by the search method
+            # TODO: change the Chapter class to support different chapters with the same number but different content
+            # Why the fix is not relevant at the moment?
+            # - I've found only a case (Tower of God where there is chapter 87 but also 87.E and 87.Extra) and the
+            # additional chapters are 404
+
+            if can_convert_to_float(number):
+                number = float(number)
+                chapter = FanFoxChapter(absolute_url, number, self.session)
+                manga_chapters.append(chapter)
+            else:
+                log.warning('⛔️  Invalid chapter number: {0}'.format(number))
 
         return manga_chapters
 

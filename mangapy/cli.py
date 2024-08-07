@@ -250,7 +250,7 @@ def start_download(download: MangaDownload):
 
 if __name__ == '__main__':
     main_folder = os.getcwd()
-    yaml_file = os.path.join(main_folder, 'sample3.yaml')
+    yaml_file = os.path.join(main_folder, 'sample4.yaml')
     sys.argv.insert(1, 'yaml')
     sys.argv.insert(2, yaml_file)
 
