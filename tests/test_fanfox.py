@@ -4,13 +4,13 @@ from mangapy.fanfox import FanFoxRepository
 from context import test_proxies as proxies
 
 
-def test_fetch_not_existing_manga():
+def test_fanfox_fetch_not_existing_manga():
     repository = FanFoxRepository()
     manga = repository.search('this manga doesn\'t exists')
     assert manga is None
 
 
-def test_fetch_manga_chapter_where_all_the_images_are_in_the_same_page():
+def test_fetch_manga_chapter_pages():
     repository = FanFoxRepository()
     manga = repository.search('ahiru no sora')
     assert manga is not None
@@ -43,7 +43,7 @@ def test_fetch_manga():
     assert first_chapter_count == 56, "The first chapter should contain 56 pages"
 
 
-def test_fetch_manga_with_missing_extra_chapters():
+def test_fanfox_fetch_manga_with_missing_extra_chapters():
     # Chapters numbered "87.E" and "87.Extra" that gets skipped by the engine
     repository = FanFoxRepository()
     manga = repository.search('tower of god')
@@ -61,7 +61,7 @@ def test_fetch_manga_with_missing_extra_chapters():
 
 
 # @pytest.mark.skip(reason="It fails most of the time using Github Actions")
-def test_fetch_manga_licensed():
+def test_fanfox_fetch_manga_licensed():
     repository = FanFoxRepository()
     # repository.proxies = proxies
     manga = repository.search('naruto')
@@ -88,7 +88,7 @@ def test_fetch_manga_licensed():
     assert last_chapter_count == 46, "The last chapter should contain 46 pages"
 
 
-def test_fetch_adult_content():
+def test_fanfox_fetch_adult_content():
     repository = FanFoxRepository()
     manga = repository.search('Backstage Lovers')
     assert manga is not None

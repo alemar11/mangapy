@@ -35,7 +35,7 @@ def _manga_title(manga_id: str) -> str | None:
     return None
 
 
-def test_mangadex_search_live():
+def test_fetch_manga():
     latest = _latest_en_chapter()
     assert latest is not None
     _, manga_id = latest
@@ -49,7 +49,7 @@ def test_mangadex_search_live():
     assert len(manga.chapters) > 0
 
 
-def test_mangadex_pages_live():
+def test_fetch_manga_chapter_pages():
     latest = _latest_en_chapter()
     assert latest is not None
     chapter_id, _ = latest
