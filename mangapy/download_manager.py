@@ -70,6 +70,9 @@ class DownloadManager:
         if not chapters:
             logging.error("❌  Chapter selection is empty.")
             return
+        if _all_chapters_external_or_empty(chapters):
+            print("⛔️  Title found, but all selected chapters are external links or have no hosted pages.")
+            return
 
         directory = os.path.join(request.output, request.source, manga.subdirectory)
         headers = repository.image_request_headers()
@@ -168,3 +171,15 @@ def _normalize_option_list(value, default: list[str]) -> list[str]:
     if isinstance(value, list):
         return [str(item) for item in value if item]
     return [str(value)]
+
+
+def _all_chapters_external_or_empty(chapters: Iterable[Chapter]) -> bool:
+    for chapter in chapters:
+        external_url = getattr(chapter, "external_url", None)
+        if external_url:
+            continue
+        pages_count = getattr(chapter, "pages_count", None)
+        if pages_count == 0:
+            continue
+        return False
+    return True
