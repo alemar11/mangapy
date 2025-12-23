@@ -125,7 +125,27 @@ class MangadexChapter(Chapter):
         self.pages_count = pages_count
 
     def pages(self) -> list[Page]:
-        return []
+        if self.external_url:
+            return []
+        if not self.chapter_uuid:
+            return []
+        response = requests.get(self.first_page_url, timeout=(10, 30))
+        if response.status_code != 200:
+            return []
+        payload = response.json()
+        if payload.get("result") != "ok":
+            return []
+        base_url = payload.get("baseUrl")
+        chapter = payload.get("chapter", {})
+        file_hash = chapter.get("hash")
+        files = chapter.get("data") or []
+        if not base_url or not file_hash:
+            return []
+        pages = []
+        for i, filename in enumerate(files):
+            url = f"{base_url}/data/{file_hash}/{filename}"
+            pages.append(Page(i, url))
+        return pages
 
 
 def _normalize_title(value: str) -> str:
