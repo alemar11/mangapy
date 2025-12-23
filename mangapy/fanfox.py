@@ -50,7 +50,7 @@ class FanFoxRepository(MangaRepository):
         list_detail = list.find('ul', {'class': 'detail-main-list'})
         if list_detail is None:
             return manga_chapters
-        chapters = list_detail.findAll('a', href=True)
+        chapters = list_detail.find_all('a', href=True)
         chapters_url = map(lambda c: c['href'], reversed(chapters))
          
         for url in chapters_url:
@@ -168,7 +168,7 @@ class FanFoxChapter(Chapter):
 
         content = response.text
         soup = BeautifulSoup(content, features="html.parser")
-        page_numbers = soup.findAll("a", {"data-page": True})
+        page_numbers = soup.find_all("a", {"data-page": True})
 
         links = []
         pages = []
