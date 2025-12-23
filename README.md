@@ -85,7 +85,7 @@ uv run python3 scripts/dev_run.py <sample-filename.yaml>
     pdf: true
     download_chapters: "10-13"
   - source: "mangadex"
-    title: "gachiakuta"
+    title: "blue lock"
     translated_language: ["en"]
     content_rating: ["safe", "suggestive", "erotica"]
     data_saver: false
