@@ -16,7 +16,11 @@ class MangadexRepository(MangaRepository):
     def capabilities(self) -> ProviderCapabilities:
         return ProviderCapabilities(max_parallel_chapters=2, max_parallel_pages=4, supports_batch_download=False)
 
-    def search(self, title) -> Manga | None:
+    def search(self, title, options: dict | None = None) -> Manga | None:
+        options = options or {}
+        translated_language = _normalize_list_option(options.get("translated_language")) or ["en"]
+        content_rating = _normalize_list_option(options.get("content_rating")) or ["safe", "suggestive", "erotica"]
+        data_saver = bool(options.get("data_saver", False))
         params = {"limit": 10, "title": title}
         response = self._get_session().get(f"{self.base_url}/manga", params=params, timeout=(10, 30))
         if response.status_code != 200:
@@ -39,10 +43,16 @@ class MangadexRepository(MangaRepository):
         attributes = best.get("attributes", {})
         manga_title = _pick_title(attributes) or title
         manga_id = best.get("id")
-        chapters = self._fetch_chapters(manga_id)
+        chapters = self._fetch_chapters(manga_id, translated_language, content_rating, data_saver)
         return MangadexManga(manga_id, manga_title, chapters)
 
-    def _fetch_chapters(self, manga_id: str | None) -> list[Chapter]:
+    def _fetch_chapters(
+        self,
+        manga_id: str | None,
+        translated_language: list[str],
+        content_rating: list[str],
+        data_saver: bool,
+    ) -> list[Chapter]:
         if not manga_id:
             return []
         chapters: list[Chapter] = []
@@ -54,8 +64,8 @@ class MangadexRepository(MangaRepository):
                 "limit": limit,
                 "offset": offset,
                 "order[chapter]": "asc",
-                "translatedLanguage[]": ["en"],
-                "contentRating[]": ["safe", "suggestive", "erotica"],
+                "translatedLanguage[]": translated_language,
+                "contentRating[]": content_rating,
             }
             response = self._get_session().get(f"{self.base_url}/chapter", params=params, timeout=(10, 30))
             if response.status_code != 200:
@@ -80,6 +90,7 @@ class MangadexRepository(MangaRepository):
                     external_url=external_url,
                     translated_language=translated_language,
                     pages_count=pages_count,
+                    data_saver=data_saver,
                     sort_key=sort_key,
                 )
                 chapters.append(chapter)
@@ -115,6 +126,7 @@ class MangadexChapter(Chapter):
         external_url: str | None = None,
         translated_language: str | None = None,
         pages_count: int | None = None,
+        data_saver: bool = False,
         sort_key=None,
     ):
         super().__init__(first_page_url, chapter_id, number, sort_key=sort_key)
@@ -123,6 +135,7 @@ class MangadexChapter(Chapter):
         self.external_url = external_url
         self.translated_language = translated_language
         self.pages_count = pages_count
+        self.data_saver = data_saver
 
     def pages(self) -> list[Page]:
         if self.external_url:
@@ -138,12 +151,16 @@ class MangadexChapter(Chapter):
         base_url = payload.get("baseUrl")
         chapter = payload.get("chapter", {})
         file_hash = chapter.get("hash")
-        files = chapter.get("data") or []
+        files = chapter.get("dataSaver") if self.data_saver else chapter.get("data")
+        files = files or []
         if not base_url or not file_hash:
             return []
         pages = []
         for i, filename in enumerate(files):
-            url = f"{base_url}/data/{file_hash}/{filename}"
+            if self.data_saver:
+                url = f"{base_url}/data-saver/{file_hash}/{filename}"
+            else:
+                url = f"{base_url}/data/{file_hash}/{filename}"
             pages.append(Page(i, url))
         return pages
 
@@ -171,6 +188,14 @@ def _title_matches(attributes: dict, normalized_query: str) -> bool:
             if _normalize_title(candidate) == normalized_query:
                 return True
     return False
+
+
+def _normalize_list_option(value) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return [str(item) for item in value if item]
+    return [str(value)]
 
 
 def _parse_float(value: str | None) -> float | None:

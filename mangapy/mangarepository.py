@@ -51,7 +51,7 @@ class MangaRepository(ABC):
         return None
 
     @abstractmethod
-    def search(self, title) -> List[Manga]:
+    def search(self, title, options: dict | None = None) -> List[Manga] | Manga | None:
         pass
 
 

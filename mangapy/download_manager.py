@@ -22,6 +22,7 @@ class DownloadRequest:
     download_last_chapter: bool = False
     download_single_chapter: str | None = None
     download_chapters: str | None = None
+    options: dict | None = None
 
 
 class DownloadManager:
@@ -37,7 +38,7 @@ class DownloadManager:
 
         print(f"🔎  Searching for {request.title} in {request.source}...")
         try:
-            manga = repository.search(request.title)
+            manga = repository.search(request.title, options=request.options)
         except Exception as exc:
             logging.error(str(exc))
             return

@@ -23,7 +23,7 @@ class DummyRepo:
     def image_request_headers(self):
         return None
 
-    def search(self, title):
+    def search(self, title, options=None):
         return Manga(title, [DummyChapter("1", 1.0), DummyChapter("2", 2.0)])
 
 

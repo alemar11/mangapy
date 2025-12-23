@@ -87,7 +87,7 @@ class FanFoxRepository(MangaRepository):
 
         return manga_chapters
 
-    def search(self, manga_name) -> List[Manga]:
+    def search(self, manga_name, options: dict | None = None) -> List[Manga]:
         # support alphanumeric names with multiple words
         manga_name_adjusted = re.sub(r'[^A-Za-z0-9]+', '_', re.sub(r'^[^A-Za-z0-9]+|[^A-Za-z0-9]+$', '', manga_name)).lower()
         manga_url = "{0}/manga/{1}".format(self.base_url, manga_name_adjusted)

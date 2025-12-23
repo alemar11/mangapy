@@ -92,6 +92,7 @@ def main_yaml(args: argparse.Namespace):
                     download_last_chapter=bool(entry.get('download_last_chapter', False)),
                     download_single_chapter=entry.get('download_single_chapter'),
                     download_chapters=entry.get('download_chapters'),
+                    options=_extract_options(entry),
                 )
                 manager.download(request)
     except Exception as error:
@@ -118,6 +119,7 @@ def main_title(args: argparse.Namespace):
         download_all_chapters=bool(args.all),
         download_single_chapter=_parse_single_chapter(args.chapter),
         download_chapters=_parse_chapter_range(args.chapter),
+        options=None,
     )
     DownloadManager().download(request)
 
@@ -162,6 +164,14 @@ def _normalize_yaml_downloads(dictionary: dict) -> list[dict]:
                 entry_with_source.setdefault('source', key)
                 downloads.append(entry_with_source)
     return downloads
+
+
+def _extract_options(entry: dict) -> dict | None:
+    options = {}
+    for key in ("translated_language", "content_rating", "data_saver"):
+        if key in entry:
+            options[key] = entry.get(key)
+    return options or None
 
 
 if __name__ == '__main__':
