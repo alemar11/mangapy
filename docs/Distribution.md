@@ -1,27 +1,21 @@
 ## Generating distribution packages:
 
-1. Make sure you have the latest version of **build** installed:  
+1. Build sdist and wheel with uv from the project root:
 
 ```
-python3 -m pip install --upgrade build
-```
-
-2. Now run this command from the project root:  
-
-```
-python3 -m build
+uv build
 ```
 
 ## Uploading the distribution archives:
 
-1. You can use **Twine** to upload the distribution packages. You’ll need to install Twine:  
+1. Publish all files under `dist/` with uv (token via env var or flag):
 
 ```
-python3 -m pip install --upgrade twine
+uv publish
 ```
 
-2. Run **Twine** to upload all of the archives under dist:  
+Or, using a token:
 
 ```
-python3 -m twine upload dist/*
+UV_PUBLISH_TOKEN=... uv publish
 ```
