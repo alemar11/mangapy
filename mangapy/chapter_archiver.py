@@ -57,7 +57,7 @@ class ChapterArchiver(object):
             shutil.rmtree(chapter_images_path, ignore_errors=True)
 
     def _fetch_image(self, url: str, headers: Mapping[str, str | bytes | None] | None):
-        response = self.session.get(url, headers=headers)
+        response = self.session.get(url, headers=headers, timeout=(10, 30))
         if response.status_code != 200:
             return None
         return response.content

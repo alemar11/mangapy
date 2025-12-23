@@ -60,6 +60,12 @@ For every manga you can choose:
 mangapy yaml PATH_TO_YOUR_YAML_FILE
 ```
 
+Samples for YAML mode live in `samples/`. For local testing from source, run:
+
+```
+pipenv run python3 scripts/dev_run.py <sample-filename.yaml>
+```
+
 ```yaml
 --- 
  debug: true # optional
