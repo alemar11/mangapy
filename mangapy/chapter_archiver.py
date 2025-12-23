@@ -46,7 +46,8 @@ class ChapterArchiver(object):
                 return  # early exit if the file is already on disk
 
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            list(tqdm(executor.map(func, pages), total=len(pages), desc=description, unit='pages', ncols=100))
+            for _ in tqdm(executor.map(func, pages), total=len(pages), desc=description, unit='pages', ncols=100):
+                pass
 
         if pdf:
             pdf_path = self.path.joinpath('pdf')
@@ -98,12 +99,16 @@ class ChapterArchiver(object):
         images_count = len(images)
         if images_count <= 0:
             return
-        elif images_count == 1:
-            first_image = images.pop(0)
-            first_image.save(pdf_path, "PDF", resolution=100.0, save_all=True)
-        else:
-            first_image = images.pop(0)
-            first_image.save(pdf_path, "PDF", resolution=100.0, save_all=True, append_images=images)
+        first_image = images.pop(0)
+        try:
+            if images_count == 1:
+                first_image.save(pdf_path, "PDF", resolution=100.0, save_all=True)
+            else:
+                first_image.save(pdf_path, "PDF", resolution=100.0, save_all=True, append_images=images)
+        finally:
+            first_image.close()
+            for image in images:
+                image.close()
 
 
 def natural_sort(list):

@@ -144,9 +144,7 @@ class FanFoxChapter(Chapter):
         key = key.replace('+', '')
         return key
 
-    def _one_link_helper(self, content, page, base_url):
-        cid = re.search(r'chapterid\s*=\s*(\d+)', content).group(1)
-        key = self._get_key(content)
+    def _one_link_helper(self, page, base_url, cid, key):
         final_url = '{}/chapterfun.ashx?cid={}&page={}&key={}'.format(base_url, cid, page, key)
         response = self.session.get(final_url)
 
@@ -190,9 +188,14 @@ class FanFoxChapter(Chapter):
             # standard flow
             page_numbers = map(lambda x: int(x['data-page']), page_numbers)
             last_page_number = max(page_numbers)
+            cid_match = re.search(r'chapterid\s*=\s*(\d+)', content)
+            if not cid_match:
+                return []
+            cid = cid_match.group(1)
+            key = self._get_key(content)
 
             for i in range(0, int(last_page_number / 2 + .5)):
-                data = self._one_link_helper(content, (i * 2) + 1, base_url)
+                data = self._one_link_helper((i * 2) + 1, base_url, cid, key)
                 links += self._parse_links(self._get_urls(data))
         
             for i, link in enumerate(links):
