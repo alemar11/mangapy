@@ -124,6 +124,15 @@ class ChapterArchiver(object):
             return lock
 
     def _download_chapter_images(self, chapter: Chapter, chapter_name: str, headers, pdf: bool):
+        external_url = getattr(chapter, "external_url", None)
+        if external_url:
+            print(f"⛔️  {chapter_name} is hosted externally and has no pages on this provider: {external_url}")
+            return
+        pages_count = getattr(chapter, "pages_count", None)
+        if pages_count == 0:
+            print(f"⛔️  {chapter_name} has no pages available on this provider.")
+            return
+
         images_path = self.path.joinpath('.images' if pdf else 'images')
         chapter_images_path = images_path.joinpath(chapter_name)
         chapter_images_path.mkdir(parents=True, exist_ok=True)
