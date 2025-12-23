@@ -50,11 +50,15 @@ def cmd_parse():
 
 
 def main():
-    args = cmd_parse()
-    if args.mode == 'title':
-        main_title(args)
-    elif args.mode == 'yaml':
-        main_yaml(args)
+    try:
+        args = cmd_parse()
+        if args.mode == 'title':
+            main_title(args)
+        elif args.mode == 'yaml':
+            main_yaml(args)
+    except KeyboardInterrupt:
+        print("\n⛔️  Download canceled by user.")
+        sys.exit(130)
 
 
 class MangaDownload:
