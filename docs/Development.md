@@ -21,30 +21,30 @@ settings.json
 }
 ```
 
-For users that want to set a default interpreter for a workspace, you can use the new setting `python.defaultInterpreterPath`. 
-i.e. `"python.defaultInterpreterPath": "/Users/amarzoli/.local/share/virtualenvs/mangapy-SS8vXwx4/bin/python"`
-
-To configure `defaultInterpreterPath` when using pipenv run: `pipenv --venv`
+For users that want to set a default interpreter for a workspace, you can use the new setting `python.defaultInterpreterPath`.
+With uv, the virtual environment is typically `.venv` in the project root, so you can set:
+`"python.defaultInterpreterPath": "<repo>/.venv/bin/python"`.
 
 
 ## Installation
 
-Install from local folder  
+Sync the environment:
 
 ```
-pip install .
+uv sync
 ```
 
-Install from local folder (editable mode)  
+By default, uv includes the `dev` dependency group; use `uv sync --no-dev` to exclude it.
+
+Run commands inside the environment:
 
 ```
-pip install -e .
+uv run python -m pytest
 ```
 
 Recreate the virtual env:
 
 ```
-pipenv shell
-pipenv --rm
-pipenv install -e .
+rm -rf .venv
+uv sync
 ```

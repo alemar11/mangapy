@@ -26,11 +26,11 @@
 ## Development tips
 - Prefer small, localized changes in `fanfox.py` to reduce breakage if the site changes.
 - When touching downloads, confirm file paths remain under the output directory and respect `~` expansion.
-- Keep CLI defaults stable; this is a published package (`pyproject.toml`, `setup.py`).
+- Keep CLI defaults stable; this is a published package (`pyproject.toml`).
 
 ## Samples
 - Sample YAML files live in `samples/`.
 - To run a sample locally, use the dev helper: `python3 scripts/dev_run.py <sample-filename.yaml>`.
-- If running from source, prefer `pipenv run python3 scripts/dev_run.py <sample-filename.yaml>` so dependencies are available.
+- If running from source, prefer `uv run python3 scripts/dev_run.py <sample-filename.yaml>` so dependencies are available.
 </INSTRUCTIONS>
 </INSTRUCTIONS>

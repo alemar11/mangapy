@@ -6,7 +6,7 @@
 python3 -m pip install --upgrade build
 ```
 
-2. Now run this command from the same directory where setup.py is located:  
+2. Now run this command from the project root:  
 
 ```
 python3 -m build

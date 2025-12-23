@@ -1,3 +1,44 @@
 [build-system]
-requires = ["setuptools", "wheel"]
-build-backend = "setuptools.build_meta:__legacy__"
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mangapy"
+version = "2.0.5"
+description = "Manga downloader"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {file = "LICENSE"}
+authors = [{name = "Alessandro Marzoli", email = "alessandromarzoli@gmail.com"}]
+urls = {Homepage = "https://github.com/alemar11/mangapy"}
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3.11",
+  "Topic :: Games/Entertainment",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Intended Audience :: End Users/Desktop",
+]
+dependencies = [
+  "bs4",
+  "pillow",
+  "pyyaml",
+  "requests",
+  "tqdm",
+]
+
+[project.scripts]
+mangapy = "mangapy.cli:main"
+
+[dependency-groups]
+dev = [
+  "flake8",
+  "pylint",
+  "pytest",
+  "rope",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["mangapy*"]
