@@ -1,20 +1,11 @@
+import ast
 import re
 import requests
 from mangapy import log
 from mangapy.mangarepository import MangaRepository, Manga, Chapter, Page
+from mangapy.utils import unpack
 from bs4 import BeautifulSoup
 from typing import List
-
-
-def unpack(p, a, c, k, e=None, d=None):
-    def baseN(num, b, numerals="0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"):
-        return ((num == 0) and numerals[0]) or (baseN(num // b, b, numerals).lstrip(numerals[0]) + numerals[num % b])
-
-    while (c):
-        c -= 1
-        if (k[c]):
-            p = re.sub("\\b" + baseN(c, a) + "\\b", k[c], p)
-    return p
 
 
 def can_convert_to_float(value):
@@ -137,15 +128,15 @@ class FanFoxChapter(Chapter):
         self.session = session
 
     def _get_urls(self, content):
-        js = re.search(r'eval\((function\b.+)\((\'[\w ].+)\)\)', content).group(0)
-        encrypted = js.split('}(')[1][:-1]
-        unpacked = eval('unpack(' + encrypted)
+        unpacked = _unpack_packed_js(content)
+        if unpacked is None:
+            raise ValueError("Packed JS not found for URLs")
         return unpacked
 
     def _get_key(self, content):
-        js = re.search(r'eval\((function\b.+)\((\'[\w ].+)\)\)', content).group(0)
-        encrypted = js.split('}(')[1][:-1]
-        unpacked = eval('unpack(' + encrypted)
+        unpacked = _unpack_packed_js(content)
+        if unpacked is None:
+            raise ValueError("Packed JS not found for key")
         key_match = re.search(r'(?<=var guidkey=)(.*)(?=\';)', unpacked)
         key = key_match.group(1)
         key = key.replace('\'', '')
@@ -214,3 +205,35 @@ if __name__ == '__main__':
     repo = FanFoxRepository()
     manga = repo.search('naruto')
     assert manga is not None
+PACKER_ARGS_RE = re.compile(
+    r"\}\(\s*"
+    r"(?P<p>('([^'\\]|\\.)*'|\"([^\"\\]|\\.)*\"))\s*,\s*"
+    r"(?P<a>\d+)\s*,\s*"
+    r"(?P<c>\d+)\s*,\s*"
+    r"(?P<k>('([^'\\]|\\.)*'|\"([^\"\\]|\\.)*\"))"
+    r"\.split\(\s*['\"]\|['\"]\s*\)"
+)
+
+
+def _js_string_unescape(quoted: str) -> str:
+    try:
+        return ast.literal_eval(quoted)
+    except Exception:
+        body = quoted[1:-1]
+        try:
+            return bytes(body, "utf-8").decode("unicode_escape")
+        except Exception:
+            return body
+
+
+def _unpack_packed_js(content: str) -> str | None:
+    match = PACKER_ARGS_RE.search(content)
+    if not match:
+        return None
+    p_raw = match.group("p")
+    a = int(match.group("a"))
+    c = int(match.group("c"))
+    k_raw = match.group("k")
+    p = _js_string_unescape(p_raw)
+    k = _js_string_unescape(k_raw).split("|")
+    return unpack(p, a, c, k)
