@@ -44,7 +44,24 @@ class DownloadManager:
             return
 
         if manga is None or len(manga.chapters) <= 0:
-            print(f"❌  Manga {request.title} doesn't exist.")
+            if manga is None:
+                print(f"❌  Manga {request.title} doesn't exist.")
+                return
+            if request.source == "mangadex":
+                options = request.options or {}
+                languages = _normalize_option_list(options.get("translated_language"), ["en"])
+                ratings = _normalize_option_list(options.get("content_rating"), ["safe", "suggestive", "erotica"])
+                language_display = ", ".join(languages) if languages else "none"
+                rating_display = ", ".join(ratings) if ratings else "none"
+                print(
+                    f"❌  {manga.title} found, but no chapters matched the requested language(s): {language_display}."
+                )
+                print(
+                    "ℹ️  Try a different language via YAML (translated_language) or adjust content_rating: "
+                    f"{rating_display}."
+                )
+                return
+            print(f"❌  Manga {request.title} has no chapters available.")
             return
 
         print(f"✅  {manga.title} found")
@@ -143,3 +160,11 @@ def _parse_number(value: str) -> float | None:
         return float(value.strip())
     except ValueError:
         return None
+
+
+def _normalize_option_list(value, default: list[str]) -> list[str]:
+    if value is None:
+        return list(default)
+    if isinstance(value, list):
+        return [str(item) for item in value if item]
+    return [str(value)]
