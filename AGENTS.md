@@ -34,4 +34,5 @@
 - Sample YAML files live in `samples/`.
 - To run a sample locally, use the dev helper: `python3 scripts/dev_run.py <sample-filename.yaml>`.
 - If running from source, prefer `uv run python3 scripts/dev_run.py <sample-filename.yaml>` so dependencies are available.
+- MangaDex YAML options (per-download): `translated_language`, `content_rating`, `data_saver`.
 </INSTRUCTIONS>

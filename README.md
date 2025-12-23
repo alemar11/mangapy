@@ -3,6 +3,7 @@
 Manga downloader supporting the following sources:
 
 - fanfox.net
+- mangadex.org (via api.mangadex.org)
 
 ## Installation
 
@@ -52,9 +53,10 @@ mangapy title "one piece" -o ~/Downloads -p '{"http": "194.226.34.132:8888", "ht
 
 Mangapy let you download multiple manga chapters as images (default) or pdfs from a *.yaml* file.
 For every manga you can choose:
-- source (*fanfox*)
+- source (*fanfox*, *mangadex*)
 - whether or not save the manga as a single pdf
 - which chapter to download (single, range, all, last)
+- MangaDex-only options: `translated_language`, `content_rating`, `data_saver`
 
 ```
 mangapy yaml PATH_TO_YOUR_YAML_FILE
@@ -82,8 +84,10 @@ uv run python3 scripts/dev_run.py <sample-filename.yaml>
     title: "naruto"
     pdf: true
     download_chapters: "10-13"
-  - source: "fanfox"
-    title: "black clover"
-    download_all_chapters: True
-    pdf: true
+  - source: "mangadex"
+    title: "gachiakuta"
+    translated_language: ["en"]
+    content_rating: ["safe", "suggestive", "erotica"]
+    data_saver: false
+    download_all_chapters: true
 ```
