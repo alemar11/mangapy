@@ -11,7 +11,10 @@ from mangapy import log
 from pathlib import Path
 from typing import Tuple
 
-version = importlib.metadata.version('mangapy')
+try:
+    version = importlib.metadata.version('mangapy')
+except importlib.metadata.PackageNotFoundError:
+    version = '0.0.0'
 default_path_to_download_folder = str(os.path.join(Path.home(), "Downloads", "mangapy"))
 
 
@@ -104,7 +107,7 @@ def main_yaml(args: argparse.Namespace):
             proxy = None
             if 'proxy' in dictionary.keys() and dictionary['proxy']:
                 proxy_info = dictionary['proxy']
-                if 'http' and 'https' in proxy_info.keys():
+                if 'http' in proxy_info.keys() and 'https' in proxy_info.keys():
                     print('Setting proxy')
                     proxy = dictionary['proxy']
                 else:
@@ -144,7 +147,7 @@ def main_title(args: argparse.Namespace):
 
     download.proxy = None
     if args.proxy:
-        if 'http' and 'https' in args.proxy.keys():
+        if 'http' in args.proxy.keys() and 'https' in args.proxy.keys():
             print('Setting proxy')
             download.proxy = args.proxy
         else:
