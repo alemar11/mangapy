@@ -45,7 +45,50 @@ class MangadexRepository(MangaRepository):
     def _fetch_chapters(self, manga_id: str | None) -> list[Chapter]:
         if not manga_id:
             return []
-        return []
+        chapters: list[Chapter] = []
+        offset = 0
+        limit = 100
+        while True:
+            params = {
+                "manga": manga_id,
+                "limit": limit,
+                "offset": offset,
+                "order[chapter]": "asc",
+                "translatedLanguage[]": ["en"],
+                "contentRating[]": ["safe", "suggestive", "erotica"],
+            }
+            response = self._get_session().get(f"{self.base_url}/chapter", params=params, timeout=(10, 30))
+            if response.status_code != 200:
+                break
+            payload = response.json()
+            data = payload.get("data", [])
+            for item in data:
+                attributes = item.get("attributes", {})
+                chapter_id = attributes.get("chapter") or item.get("id")
+                number = _parse_float(attributes.get("chapter"))
+                volume = attributes.get("volume")
+                external_url = attributes.get("externalUrl")
+                translated_language = attributes.get("translatedLanguage")
+                pages_count = attributes.get("pages")
+                sort_key = _chapter_sort_key(volume, attributes.get("chapter"), chapter_id)
+                chapter = MangadexChapter(
+                    first_page_url=f"{self.base_url}/at-home/server/{item.get('id')}",
+                    chapter_id=chapter_id,
+                    number=number,
+                    volume=volume,
+                    chapter_uuid=item.get("id"),
+                    external_url=external_url,
+                    translated_language=translated_language,
+                    pages_count=pages_count,
+                    sort_key=sort_key,
+                )
+                chapters.append(chapter)
+
+            total = payload.get("total", 0)
+            offset += limit
+            if offset >= total:
+                break
+        return chapters
 
     def _get_session(self) -> requests.Session:
         session = getattr(self._session_local, "session", None)
@@ -62,8 +105,24 @@ class MangadexManga(Manga):
 
 
 class MangadexChapter(Chapter):
-    def __init__(self, first_page_url: str, chapter_id: str, number: float | None = None):
-        super().__init__(first_page_url, chapter_id, number)
+    def __init__(
+        self,
+        first_page_url: str,
+        chapter_id: str,
+        number: float | None = None,
+        volume: str | None = None,
+        chapter_uuid: str | None = None,
+        external_url: str | None = None,
+        translated_language: str | None = None,
+        pages_count: int | None = None,
+        sort_key=None,
+    ):
+        super().__init__(first_page_url, chapter_id, number, sort_key=sort_key)
+        self.volume = volume
+        self.chapter_uuid = chapter_uuid
+        self.external_url = external_url
+        self.translated_language = translated_language
+        self.pages_count = pages_count
 
     def pages(self) -> list[Page]:
         return []
@@ -92,3 +151,24 @@ def _title_matches(attributes: dict, normalized_query: str) -> bool:
             if _normalize_title(candidate) == normalized_query:
                 return True
     return False
+
+
+def _parse_float(value: str | None) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except ValueError:
+        return None
+
+
+def _chapter_sort_key(volume: str | None, chapter: str | None, chapter_id: str):
+    volume_number = _parse_float(volume)
+    chapter_number = _parse_float(chapter)
+    if chapter_number is not None:
+        if volume_number is not None:
+            return (0, volume_number, chapter_number, chapter_id)
+        return (0, chapter_number, chapter_id)
+    if volume_number is not None:
+        return (1, volume_number, chapter_id)
+    return (2, chapter_id)
