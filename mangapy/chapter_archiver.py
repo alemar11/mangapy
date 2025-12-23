@@ -14,6 +14,9 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 
+tqdm.set_lock(threading.RLock())
+
+
 class ChapterArchiver(object):
     def __init__(self, path: str, max_workers=1):
         self.max_workers = max_workers
