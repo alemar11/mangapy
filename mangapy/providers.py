@@ -16,8 +16,10 @@ def load_providers() -> None:
     if _LOADED:
         return
     from mangapy.fanfox import FanFoxRepository
+    from mangapy.mangadex import MangadexRepository
 
     register_provider("fanfox", FanFoxRepository)
+    register_provider("mangadex", MangadexRepository)
     _LOADED = True
 
 
