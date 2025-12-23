@@ -90,7 +90,7 @@ class MangaDownload:
             if len(chapters) == 2:
                 begin = float(chapters[0])
                 end = float(chapters[1]) if chapters[1] else None
-            if begin and end and (float(begin) > float(end)):
+            if begin is not None and end is not None and (float(begin) > float(end)):
                 sys.exit('{0}: error: invalid chapter interval, the end should be bigger than start'.format(chapters))
             return begin, end
         return None
@@ -231,7 +231,7 @@ def start_download(download: MangaDownload):
         for index, chapter in enumerate(manga.chapters):
             if chapter.number == range_begin:
                 start = index
-            if range_end and chapter.number == range_end:
+            if range_end is not None and chapter.number == range_end:
                 stop = index + 1
         for chapter in manga.chapters[start:stop]:
             chapters.append(chapter)
@@ -252,18 +252,4 @@ def start_download(download: MangaDownload):
 
 
 if __name__ == '__main__':
-    main_folder = os.getcwd()
-    yaml_file = os.path.join(main_folder, 'sample4.yaml')
-    sys.argv.insert(1, 'yaml')
-    sys.argv.insert(2, yaml_file)
-
-    # sys.argv.insert(1, 'title')
-    # sys.argv.insert(2, 'jujutsu kaisen')
-    # sys.argv.insert(3, '-o ~/Downloads/mangapy_test')
-    # sys.argv.insert(4, '-c 1-100')
-    # sys.argv.insert(5, '-s fanfox')
-    # sys.argv.insert(6, '--pdf')
-    # sys.argv.insert(7, '--debug')
-    # sys.argv.insert(8, '-p {"http": "http://31.14.131.70:8080", "https": "http://31.14.131.70:8080"}')
-
     main()

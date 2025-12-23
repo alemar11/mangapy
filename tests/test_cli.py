@@ -70,3 +70,8 @@ def test_main_title_rejects_proxy_missing_http(monkeypatch):
     cli.main_title(args)
 
     assert captured["download"].proxy is None
+
+
+def test_download_range_allows_zero_start():
+    download = cli.MangaDownload(download_chapters="0-2")
+    assert download.download_range() == (0.0, 2.0)
