@@ -1,8 +1,10 @@
 import ast
 import re
 import requests
+import threading
 from mangapy import log
 from mangapy.mangarepository import MangaRepository, Manga, Chapter, Page
+from mangapy.capabilities import ProviderCapabilities
 from mangapy.utils import unpack
 from bs4 import BeautifulSoup
 from typing import List
@@ -22,12 +24,26 @@ class FanFoxRepository(MangaRepository):
     proxies = None
     _session = None
 
+    def __init__(self):
+        self._session_local = threading.local()
+
+    @property
+    def capabilities(self) -> ProviderCapabilities:
+        return ProviderCapabilities(max_parallel_chapters=1, max_parallel_pages=1, supports_batch_download=False)
+
+    def image_request_headers(self) -> dict[str, str] | None:
+        return {"Referer": f"{self.base_url}"}
+
     @property
     def session(self):
-        if self._session is not None:
-            return self._session
+        return self._get_session()
 
-        self._session = requests.Session()
+    def _get_session(self):
+        session = getattr(self._session_local, "session", None)
+        if session is not None:
+            return session
+
+        session = requests.Session()
         headers = {
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=1.0,image/webp,image/apng,*/*;q=1.0',
             'Accept-Encoding': 'gzip, deflate',
@@ -38,10 +54,11 @@ class FanFoxRepository(MangaRepository):
             'Connection': 'keep-alive'
         }
 
-        self._session.cookies['isAdult'] = '1'
-        self._session.headers = headers
-        self._session.proxies = self.proxies
-        return self._session
+        session.cookies['isAdult'] = '1'
+        session.headers = headers
+        session.proxies = self.proxies
+        self._session_local.session = session
+        return session
 
     def _get_chapters(self, list):
         manga_chapters = []
@@ -54,7 +71,7 @@ class FanFoxRepository(MangaRepository):
         chapters_url = map(lambda c: c['href'], reversed(chapters))
          
         for url in chapters_url:
-            number = url.split("/")[-2][1:]  # relative url, TODO: regex
+            chapter_id = url.split("/")[-2][1:]  # relative url, TODO: regex
             absolute_url = "{0}{1}".format(self.base_url, url)
 
             # if number is not convertible than chapters can be properly ordered
@@ -64,12 +81,9 @@ class FanFoxRepository(MangaRepository):
             # - I've found only a case (Tower of God where there is chapter 87 but also 87.E and 87.Extra) and the
             # additional chapters are 404
 
-            if can_convert_to_float(number):
-                number = float(number)
-                chapter = FanFoxChapter(absolute_url, number, self.session)
-                manga_chapters.append(chapter)
-            else:
-                log.warning('⛔️  Invalid chapter number: {0}'.format(number))
+            number = float(chapter_id) if can_convert_to_float(chapter_id) else None
+            chapter = FanFoxChapter(absolute_url, chapter_id, number, self._get_session)
+            manga_chapters.append(chapter)
 
         return manga_chapters
 
@@ -111,21 +125,20 @@ class FanFoxRepository(MangaRepository):
         seen = set()
         unique_chapters = []
         for chapter in chapters:
-            if chapter.number not in seen:
+            if chapter.chapter_id not in seen:
                 unique_chapters.append(chapter)
-                seen.add(chapter.number)
+                seen.add(chapter.chapter_id)
                
-        sorted_chapters = sorted(unique_chapters, key=lambda chapter: chapter.number, reverse=False)
+        sorted_chapters = sorted(unique_chapters, key=lambda chapter: chapter.sort_key, reverse=False)
 
         manga = Manga(manga_name, sorted_chapters)
         return manga
 
 
 class FanFoxChapter(Chapter):
-    def __init__(self, first_page_url, number, session: requests.Session):
-        self.first_page_url = first_page_url
-        self.number = number
-        self.session = session
+    def __init__(self, first_page_url, chapter_id, number, session_provider):
+        super().__init__(first_page_url, chapter_id, number)
+        self._session_provider = session_provider
 
     def _get_urls(self, content):
         unpacked = _unpack_packed_js(content)
@@ -146,7 +159,8 @@ class FanFoxChapter(Chapter):
 
     def _one_link_helper(self, page, base_url, cid, key):
         final_url = '{}/chapterfun.ashx?cid={}&page={}&key={}'.format(base_url, cid, page, key)
-        response = self.session.get(final_url)
+        session = self._session_provider()
+        response = session.get(final_url)
 
         if response is None or response.status_code != 200:
             return None
@@ -161,7 +175,8 @@ class FanFoxChapter(Chapter):
 
     def pages(self) -> List[Page]:
         base_url = self.first_page_url[:self.first_page_url.rfind('/')]
-        response = self.session.get(self.first_page_url)
+        session = self._session_provider()
+        response = session.get(self.first_page_url)
 
         if response is None or response.status_code != 200:
             return None

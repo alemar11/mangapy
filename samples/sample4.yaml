@@ -1,7 +1,8 @@
 ---
 debug: true # optional
 output: "~/Downloads/Mangapy_sample4"
-fanfox:
-  - title: "tower of god"
+downloads:
+  - source: "fanfox"
+    title: "tower of god"
     pdf: true
     download_chapters: "85-"

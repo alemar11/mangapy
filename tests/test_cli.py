@@ -1,15 +1,16 @@
 import argparse
 
 import mangapy.cli as cli
+from mangapy import download_manager
 
 
-def _capture_download(monkeypatch):
+def _capture_request(monkeypatch):
     captured = {}
 
-    def fake_start(download):
-        captured["download"] = download
+    def fake_download(self, request):
+        captured["request"] = request
 
-    monkeypatch.setattr(cli, "start_download", fake_start)
+    monkeypatch.setattr(cli.DownloadManager, "download", fake_download)
     return captured
 
 
@@ -37,7 +38,7 @@ def test_cmd_parse_title(monkeypatch):
 
 
 def test_main_title_accepts_valid_proxy(monkeypatch):
-    captured = _capture_download(monkeypatch)
+    captured = _capture_request(monkeypatch)
     args = argparse.Namespace(
         manga_title="bleach",
         out="/tmp/out",
@@ -51,11 +52,11 @@ def test_main_title_accepts_valid_proxy(monkeypatch):
 
     cli.main_title(args)
 
-    assert captured["download"].proxy == {"http": "h", "https": "s"}
+    assert captured["request"].proxy == {"http": "h", "https": "s"}
 
 
 def test_main_title_rejects_proxy_missing_http(monkeypatch):
-    captured = _capture_download(monkeypatch)
+    captured = _capture_request(monkeypatch)
     args = argparse.Namespace(
         manga_title="bleach",
         out="/tmp/out",
@@ -69,9 +70,8 @@ def test_main_title_rejects_proxy_missing_http(monkeypatch):
 
     cli.main_title(args)
 
-    assert captured["download"].proxy is None
+    assert captured["request"].proxy is None
 
 
 def test_download_range_allows_zero_start():
-    download = cli.MangaDownload(download_chapters="0-2")
-    assert download.download_range() == (0.0, 2.0)
+    assert download_manager._parse_range("0-2") == (0.0, 2.0)

@@ -1,16 +1,20 @@
 --- 
  debug: true # optional
  output: "~/Downloads/Mangapy_sample2"
- fanfox:
-  - title: "black clover"
+ downloads:
+  - source: "fanfox"
+    title: "black clover"
     pdf: true
     download_chapters: "243-"
-  - title: "one piece"
+  - source: "fanfox"
+    title: "one piece"
     pdf: true
     download_chapters: "974-"
-  - title: "vinland saga"
+  - source: "fanfox"
+    title: "vinland saga"
     pdf: true
     download_chapters: "100-"
-  - title: "ao no exorcist"
+  - source: "fanfox"
+    title: "ao no exorcist"
     pdf: true
     download_chapters: "75-"
