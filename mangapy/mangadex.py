@@ -1,5 +1,6 @@
 import requests
 import threading
+import time
 
 from mangapy.capabilities import ProviderCapabilities
 from mangapy.mangarepository import MangaRepository, Manga, Chapter, Page
@@ -11,10 +12,12 @@ class MangadexRepository(MangaRepository):
 
     def __init__(self):
         self._session_local = threading.local()
+        self._rate_lock = threading.Lock()
+        self._last_request = 0.0
 
     @property
     def capabilities(self) -> ProviderCapabilities:
-        return ProviderCapabilities(max_parallel_chapters=2, max_parallel_pages=4, supports_batch_download=False)
+        return ProviderCapabilities(max_parallel_chapters=2, max_parallel_pages=4, supports_batch_download=False, rate_limit=2.0)
 
     def search(self, title, options: dict | None = None) -> Manga | None:
         options = options or {}
@@ -22,10 +25,9 @@ class MangadexRepository(MangaRepository):
         content_rating = _normalize_list_option(options.get("content_rating")) or ["safe", "suggestive", "erotica"]
         data_saver = bool(options.get("data_saver", False))
         params = {"limit": 10, "title": title}
-        response = self._get_session().get(f"{self.base_url}/manga", params=params, timeout=(10, 30))
-        if response.status_code != 200:
+        payload = self._request_json(f"{self.base_url}/manga", params=params)
+        if payload is None:
             return None
-        payload = response.json()
         results = payload.get("data", [])
         if not results:
             return None
@@ -67,10 +69,9 @@ class MangadexRepository(MangaRepository):
                 "translatedLanguage[]": translated_language,
                 "contentRating[]": content_rating,
             }
-            response = self._get_session().get(f"{self.base_url}/chapter", params=params, timeout=(10, 30))
-            if response.status_code != 200:
+            payload = self._request_json(f"{self.base_url}/chapter", params=params)
+            if payload is None:
                 break
-            payload = response.json()
             data = payload.get("data", [])
             for item in data:
                 attributes = item.get("attributes", {})
@@ -92,6 +93,7 @@ class MangadexRepository(MangaRepository):
                     pages_count=pages_count,
                     data_saver=data_saver,
                     sort_key=sort_key,
+                    requester=self._request_json,
                 )
                 chapters.append(chapter)
 
@@ -107,6 +109,39 @@ class MangadexRepository(MangaRepository):
             session = requests.Session()
             self._session_local.session = session
         return session
+
+    def _request_json(self, url: str, params: dict | None = None) -> dict | None:
+        response = self._request(url, params=params)
+        if response is None or response.status_code != 200:
+            return None
+        try:
+            return response.json()
+        except ValueError:
+            return None
+
+    def _request(self, url: str, params: dict | None = None) -> requests.Response | None:
+        session = self._get_session()
+        for attempt in range(3):
+            self._apply_rate_limit()
+            response = session.get(url, params=params, timeout=(10, 30))
+            if response.status_code == 429 or response.status_code >= 500:
+                delay = _retry_delay(response, attempt)
+                time.sleep(delay)
+                continue
+            return response
+        return response
+
+    def _apply_rate_limit(self) -> None:
+        rate_limit = self.capabilities.rate_limit
+        if not rate_limit:
+            return
+        min_interval = 1.0 / rate_limit
+        with self._rate_lock:
+            now = time.monotonic()
+            elapsed = now - self._last_request
+            if elapsed < min_interval:
+                time.sleep(min_interval - elapsed)
+            self._last_request = time.monotonic()
 
 
 class MangadexManga(Manga):
@@ -127,6 +162,7 @@ class MangadexChapter(Chapter):
         translated_language: str | None = None,
         pages_count: int | None = None,
         data_saver: bool = False,
+        requester=None,
         sort_key=None,
     ):
         super().__init__(first_page_url, chapter_id, number, sort_key=sort_key)
@@ -136,16 +172,22 @@ class MangadexChapter(Chapter):
         self.translated_language = translated_language
         self.pages_count = pages_count
         self.data_saver = data_saver
+        self._requester = requester
 
     def pages(self) -> list[Page]:
         if self.external_url:
             return []
         if not self.chapter_uuid:
             return []
-        response = requests.get(self.first_page_url, timeout=(10, 30))
-        if response.status_code != 200:
+        if self._requester is None:
+            response = requests.get(self.first_page_url, timeout=(10, 30))
+            if response.status_code != 200:
+                return []
+            payload = response.json()
+        else:
+            payload = self._requester(self.first_page_url)
+        if payload is None:
             return []
-        payload = response.json()
         if payload.get("result") != "ok":
             return []
         base_url = payload.get("baseUrl")
@@ -217,3 +259,10 @@ def _chapter_sort_key(volume: str | None, chapter: str | None, chapter_id: str):
     if volume_number is not None:
         return (1, volume_number, chapter_id)
     return (2, chapter_id)
+
+
+def _retry_delay(response: requests.Response, attempt: int) -> float:
+    retry_after = response.headers.get("Retry-After")
+    if retry_after and retry_after.isdigit():
+        return float(retry_after)
+    return min(2 ** attempt, 5)
