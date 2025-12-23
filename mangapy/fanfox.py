@@ -18,9 +18,17 @@ def can_convert_to_float(value):
         return False
 
 
+def _normalize_title(value: str) -> str:
+    return "".join(ch for ch in value.lower() if ch.isalnum())
+
+
+def _slugify_title(value: str) -> str:
+    return re.sub(r'[^A-Za-z0-9]+', '_', re.sub(r'^[^A-Za-z0-9]+|[^A-Za-z0-9]+$', '', value)).lower()
+
+
 class FanFoxRepository(MangaRepository):
     name = "FanFox"
-    base_url = "http://fanfox.net"
+    base_url = "https://fanfox.net"
     proxies = None
     _session = None
 
@@ -88,11 +96,20 @@ class FanFoxRepository(MangaRepository):
         return manga_chapters
 
     def search(self, manga_name, options: dict | None = None) -> List[Manga]:
-        # support alphanumeric names with multiple words
-        manga_name_adjusted = re.sub(r'[^A-Za-z0-9]+', '_', re.sub(r'^[^A-Za-z0-9]+|[^A-Za-z0-9]+$', '', manga_name)).lower()
-        manga_url = "{0}/manga/{1}".format(self.base_url, manga_name_adjusted)
-        response = self.session.get(url=manga_url)
+        manga_name_adjusted = _slugify_title(manga_name)
+        manga_url = "{0}/manga/{1}/".format(self.base_url, manga_name_adjusted)
+        manga = self._fetch_manga(manga_url, manga_name)
+        if manga is not None:
+            return manga
 
+        match = self._search_manga(manga_name)
+        if match is None:
+            return None
+        match_title, match_url = match
+        return self._fetch_manga(match_url, match_title)
+
+    def _fetch_manga(self, manga_url: str, fallback_title: str) -> Manga | None:
+        response = self.session.get(url=manga_url)
         if response is None or response.status_code != 200:
             return None
 
@@ -128,11 +145,44 @@ class FanFoxRepository(MangaRepository):
             if chapter.chapter_id not in seen:
                 unique_chapters.append(chapter)
                 seen.add(chapter.chapter_id)
-               
-        sorted_chapters = sorted(unique_chapters, key=lambda chapter: chapter.sort_key, reverse=False)
 
-        manga = Manga(manga_name, sorted_chapters)
-        return manga
+        sorted_chapters = sorted(unique_chapters, key=lambda chapter: chapter.sort_key, reverse=False)
+        return Manga(fallback_title, sorted_chapters)
+
+    def _search_manga(self, manga_name: str) -> tuple[str, str] | None:
+        response = self.session.get(f"{self.base_url}/search", params={"title": manga_name})
+        if response is None or response.status_code != 200:
+            return None
+
+        soup = BeautifulSoup(response.text, features="html.parser")
+        results: list[tuple[str, str]] = []
+        for item in soup.select("ul.manga-list-4-list li"):
+            title_link = item.select_one("p.manga-list-4-item-title a")
+            if not title_link:
+                continue
+            title = title_link.get_text(strip=True)
+            href = title_link.get("href")
+            if not title or not href:
+                continue
+            url = href if href.startswith("http") else f"{self.base_url}{href}"
+            results.append((title, url))
+
+        if not results:
+            return None
+
+        normalized_query = _normalize_title(manga_name)
+        partial_matches = []
+        for title, url in results:
+            normalized_title = _normalize_title(title)
+            if normalized_title == normalized_query:
+                return title, url
+            if normalized_query and normalized_query in normalized_title:
+                partial_matches.append((title, url))
+
+        if partial_matches:
+            return partial_matches[0]
+
+        return None
 
 
 class FanFoxChapter(Chapter):
@@ -156,6 +206,21 @@ class FanFoxChapter(Chapter):
         key = key.replace('\\', '')
         key = key.replace('+', '')
         return key
+
+    def _fetch_chapterfun_links(self, base_url, cid, imagecount, key):
+        if not imagecount or imagecount <= 0:
+            return []
+        links = []
+        for i in range(0, int(imagecount / 2 + .5)):
+            data = self._one_link_helper((i * 2) + 1, base_url, cid, key)
+            if not data:
+                return None
+            try:
+                unpacked = self._get_urls(data)
+            except ValueError:
+                return None
+            links += self._parse_links(unpacked)
+        return links
 
     def _one_link_helper(self, page, base_url, cid, key):
         final_url = '{}/chapterfun.ashx?cid={}&page={}&key={}'.format(base_url, cid, page, key)
@@ -188,6 +253,23 @@ class FanFoxChapter(Chapter):
         links = []
         pages = []
 
+        cid_match = re.search(r'chapterid\s*=\s*(\d+)', content)
+        imagecount_match = re.search(r'imagecount\s*=\s*(\d+)', content)
+        if cid_match and imagecount_match:
+            cid = cid_match.group(1)
+            imagecount = int(imagecount_match.group(1))
+            links = self._fetch_chapterfun_links(base_url, cid, imagecount, "")
+            if links is None:
+                try:
+                    key = self._get_key(content)
+                except ValueError:
+                    key = ""
+                links = self._fetch_chapterfun_links(base_url, cid, imagecount, key)
+            if links:
+                for i, link in enumerate(links):
+                    pages.append(Page(i, link))
+                return pages
+
         if not len(page_numbers):
             # sometimes all the images are loaded in the same html page
             scripts = soup.find_all("script", {"type": "text/javascript"})
@@ -212,7 +294,7 @@ class FanFoxChapter(Chapter):
             for i in range(0, int(last_page_number / 2 + .5)):
                 data = self._one_link_helper((i * 2) + 1, base_url, cid, key)
                 links += self._parse_links(self._get_urls(data))
-        
+
             for i, link in enumerate(links):
                 pages.append(Page(i, link))
 
