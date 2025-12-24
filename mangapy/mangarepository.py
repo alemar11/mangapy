@@ -3,6 +3,8 @@ import re
 from abc import ABC, abstractmethod
 from typing import List
 
+from mangapy.capabilities import ProviderCapabilities
+
 
 class Page():
     def __init__(self, number: int, url: str):
@@ -11,9 +13,11 @@ class Page():
 
 
 class Chapter(ABC):
-    def __init__(self, first_page_url: str, number: float):
+    def __init__(self, first_page_url: str, chapter_id: str, number: float | None = None, sort_key=None):
         self.first_page_url = first_page_url
+        self.chapter_id = chapter_id
         self.number = number
+        self.sort_key = sort_key if sort_key is not None else chapter_sort_key(chapter_id, number)
 
     @abstractmethod
     def pages(self) -> List[Page]:
@@ -39,6 +43,19 @@ class Manga(ABC):
 class MangaRepository(ABC):
     base_url = None
 
+    @property
+    def capabilities(self) -> ProviderCapabilities:
+        return ProviderCapabilities()
+
+    def image_request_headers(self) -> dict[str, str] | None:
+        return None
+
     @abstractmethod
-    def search(self, title) -> List[Manga]:
+    def search(self, title, options: dict | None = None) -> List[Manga] | Manga | None:
         pass
+
+
+def chapter_sort_key(chapter_id: str, number: float | None):
+    if number is None:
+        return (1, chapter_id)
+    return (0, number, chapter_id)

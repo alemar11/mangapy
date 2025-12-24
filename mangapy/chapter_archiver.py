@@ -3,6 +3,7 @@ import os
 import re
 import requests
 import shutil
+import threading
 from collections.abc import Mapping
 from functools import partial
 from tqdm import tqdm
@@ -13,51 +14,44 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 
-class ChapterArchiver(object):
-    session = requests.Session()
+tqdm.set_lock(threading.RLock())
 
+
+class ChapterArchiver(object):
     def __init__(self, path: str, max_workers=1):
         self.max_workers = max_workers
         self.path = Path(path).expanduser()
+        self._session_local = threading.local()
+        self._pdf_lock_guard = threading.Lock()
+        self._pdf_locks = {}
 
     def archive(self, chapter: Chapter, pdf: bool, headers: Mapping[str, str | bytes | None] | None):
-        if pdf:
-            images_path = self.path.joinpath('.images')
+        chapter_id = getattr(chapter, "chapter_id", None)
+        if chapter.number is not None:
+            isChapterNumberAnInt = isinstance(chapter.number, int) or chapter.number.is_integer()
+            chapter_name = str(int(chapter.number)) if isChapterNumberAnInt else str(chapter.number)
         else:
-            images_path = self.path.joinpath('images')
-
-        isChapterNumberAnInt = isinstance(chapter.number, int) or chapter.number.is_integer()
-        chapter_name = str(int(chapter.number)) if isChapterNumberAnInt else str(chapter.number)
-        chapter_images_path = images_path.joinpath(chapter_name)
-        chapter_images_path.mkdir(parents=True, exist_ok=True)
-        pages = chapter.pages()
-        if pages is None or not len(pages):
-            print("🆘  {0} doesn't have any pages and it will be skipped.".format(chapter_name))
-            return
-
-        description = ('Chapter {0}'.format(chapter_name))
-        func = partial(self._save_image, chapter_images_path, headers)  # currying
-
-        if pdf:
-            pdf_path = self.path.joinpath('pdf')
-            chapter_pdf_file_path = pdf_path.joinpath(chapter_name + '.pdf')
-            if os.path.isfile(chapter_pdf_file_path):
-                print("⏺  {0} already downloaded and it will be skipped.".format(chapter_name))
-                return  # early exit if the file is already on disk
-
-        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            for _ in tqdm(executor.map(func, pages), total=len(pages), desc=description, unit='pages', ncols=100):
-                pass
+            chapter_name = chapter_id if chapter_id is not None else "unknown"
 
         if pdf:
             pdf_path = self.path.joinpath('pdf')
             pdf_path.mkdir(parents=True, exist_ok=True)
             chapter_pdf_file_path = pdf_path.joinpath(chapter_name + '.pdf')
-            self._create_chapter_pdf(chapter_images_path, chapter_pdf_file_path)
-            shutil.rmtree(chapter_images_path, ignore_errors=True)
+            lock = self._get_pdf_lock(chapter_pdf_file_path)
+            with lock:
+                if os.path.isfile(chapter_pdf_file_path):
+                    print("⏺  {0} already downloaded and it will be skipped.".format(chapter_name))
+                    return  # early exit if the file is already on disk
+                self._download_chapter_images(chapter, chapter_name, headers, pdf=True)
+                chapter_images_path = self.path.joinpath('.images', chapter_name)
+                self._create_chapter_pdf(chapter_images_path, chapter_pdf_file_path)
+                shutil.rmtree(chapter_images_path, ignore_errors=True)
+        else:
+            self._download_chapter_images(chapter, chapter_name, headers, pdf=False)
 
     def _fetch_image(self, url: str, headers: Mapping[str, str | bytes | None] | None):
-        response = self.session.get(url, headers=headers, timeout=(10, 30))
+        session = self._get_session()
+        response = session.get(url, headers=headers, timeout=(10, 30))
         if response.status_code != 200:
             return None
         return response.content
@@ -100,15 +94,62 @@ class ChapterArchiver(object):
         if images_count <= 0:
             return
         first_image = images.pop(0)
+        tmp_path = pdf_path.with_name(pdf_path.name + ".tmp")
         try:
             if images_count == 1:
-                first_image.save(pdf_path, "PDF", resolution=100.0, save_all=True)
+                first_image.save(tmp_path, "PDF", resolution=100.0, save_all=True)
             else:
-                first_image.save(pdf_path, "PDF", resolution=100.0, save_all=True, append_images=images)
+                first_image.save(tmp_path, "PDF", resolution=100.0, save_all=True, append_images=images)
+            tmp_path.replace(pdf_path)
         finally:
             first_image.close()
             for image in images:
                 image.close()
+            if tmp_path.exists():
+                try:
+                    tmp_path.unlink()
+                except OSError:
+                    pass
+
+    def _get_session(self) -> requests.Session:
+        session = getattr(self._session_local, "session", None)
+        if session is None:
+            session = requests.Session()
+            self._session_local.session = session
+        return session
+
+    def _get_pdf_lock(self, pdf_path: Path) -> threading.Lock:
+        with self._pdf_lock_guard:
+            lock = self._pdf_locks.get(pdf_path)
+            if lock is None:
+                lock = threading.Lock()
+                self._pdf_locks[pdf_path] = lock
+            return lock
+
+    def _download_chapter_images(self, chapter: Chapter, chapter_name: str, headers, pdf: bool):
+        external_url = getattr(chapter, "external_url", None)
+        if external_url:
+            print(f"⛔️  {chapter_name} is hosted externally and has no pages on this provider: {external_url}")
+            return
+        pages_count = getattr(chapter, "pages_count", None)
+        if pages_count == 0:
+            print(f"⛔️  {chapter_name} has no pages available on this provider.")
+            return
+
+        images_path = self.path.joinpath('.images' if pdf else 'images')
+        chapter_images_path = images_path.joinpath(chapter_name)
+        chapter_images_path.mkdir(parents=True, exist_ok=True)
+        pages = chapter.pages()
+        if pages is None or not len(pages):
+            print("🆘  {0} doesn't have any pages and it will be skipped.".format(chapter_name))
+            return
+
+        description = ('Chapter {0}'.format(chapter_name))
+        func = partial(self._save_image, chapter_images_path, headers)  # currying
+
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            for _ in tqdm(executor.map(func, pages), total=len(pages), desc=description, unit='pages', ncols=100):
+                pass
 
 
 def natural_sort(list):

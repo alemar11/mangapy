@@ -1,15 +1,11 @@
 import argparse
 import yaml
 import json
-import logging
-import os
 import importlib.metadata
+import os
 import sys
-from mangapy.fanfox import FanFoxRepository
-from mangapy.chapter_archiver import ChapterArchiver
-from mangapy import log
+from mangapy.download_manager import DownloadManager, DownloadRequest
 from pathlib import Path
-from typing import Tuple
 
 try:
     version = importlib.metadata.version('mangapy')
@@ -61,198 +57,121 @@ def main():
         sys.exit(130)
 
 
-class MangaDownload:
-    def __init__(self, **entries):
-        self.__dict__.update(entries)
-
-    def save_as_pdf(self) -> bool:
-        if 'pdf' in self.__dict__.keys():
-            return self.__dict__['pdf']
-        return None
-
-    def download_single(self) -> float:
-        if 'download_single_chapter' in self.__dict__.keys():
-            return float(self.__dict__['download_single_chapter'].strip())
-        return None
-
-    def download_last(self) -> bool:
-        if 'download_last_chapter' in self.__dict__.keys():
-            return self.__dict__['download_last_chapter']
-        return False
-
-    def download_all(self) -> bool:
-        if 'download_all_chapters' in self.__dict__.keys():
-            return self.__dict__['download_all_chapters']
-        return False
-
-    def download_range(self) -> Tuple[float, float]:
-        if 'download_chapters' in self.__dict__.keys():
-            chapters = self.__dict__['download_chapters']
-            chapters = chapters.split('-')
-            begin = None
-            end = None
-            if len(chapters) == 2:
-                begin = float(chapters[0])
-                end = float(chapters[1]) if chapters[1] else None
-            if begin is not None and end is not None and (float(begin) > float(end)):
-                sys.exit('{0}: error: invalid chapter interval, the end should be bigger than start'.format(chapters))
-            return begin, end
-        return None
-
-
 def main_yaml(args: argparse.Namespace):
     yaml_file = args.yaml_file.strip()
 
     try:
         with open(yaml_file, 'r') as f:
             dictionary = yaml.load(f, Loader=yaml.FullLoader)
-            output = dictionary['output']
+            output = dictionary.get('output', default_path_to_download_folder)
 
             proxy = None
             if 'proxy' in dictionary.keys() and dictionary['proxy']:
                 proxy_info = dictionary['proxy']
-                if 'http' in proxy_info.keys() and 'https' in proxy_info.keys():
+                if _is_valid_proxy(proxy_info):
                     print('Setting proxy')
                     proxy = dictionary['proxy']
                 else:
                     print('The proxy is not in the right format and it will not be used.')
 
-            debug_log = False
-            if 'debug' in dictionary.keys() and dictionary['debug']:
-                debug_log = True
-
-            if 'fanfox' in dictionary.keys():
-                for download in list(map(lambda manga: MangaDownload(**manga), dictionary['fanfox'])):
-                    download.source = 'fanfox'
-                    download.enable_debug_log = debug_log
-                    download.output = output
-                    download.proxy = proxy
-                    start_download(download)
+            debug_log = bool(dictionary.get('debug', False))
+            downloads = _normalize_yaml_downloads(dictionary)
+            manager = DownloadManager()
+            for entry in downloads:
+                title = entry.get('title')
+                if not title:
+                    continue
+                request = DownloadRequest(
+                    title=title.strip(),
+                    source=_normalize_source(entry.get('source', 'fanfox')),
+                    output=str(entry.get('output', output)).strip(),
+                    pdf=bool(entry.get('pdf', False)),
+                    proxy=entry.get('proxy', proxy),
+                    enable_debug_log=bool(entry.get('debug', debug_log)),
+                    download_all_chapters=bool(entry.get('download_all_chapters', False)),
+                    download_last_chapter=bool(entry.get('download_last_chapter', False)),
+                    download_single_chapter=entry.get('download_single_chapter'),
+                    download_chapters=entry.get('download_chapters'),
+                    options=_extract_options(entry),
+                )
+                manager.download(request)
     except Exception as error:
         print(error)
 
 
 def main_title(args: argparse.Namespace):
-    download = MangaDownload()
-    download.title = args.manga_title.strip()
-    download.output = args.out.strip()
-    download.pdf = args.pdf or False
-    source = args.source
-
-    if args.debug:
-        download.enable_debug_log = True
-    else:
-        download.enable_debug_log = False
-
-    if source is None:
-        download.source = 'fanfox'
-    else:
-        download.source = source.strip().lower()
-
-    download.proxy = None
+    source = _normalize_source(args.source) if args.source else 'fanfox'
+    proxy = None
     if args.proxy:
-        if 'http' in args.proxy.keys() and 'https' in args.proxy.keys():
+        if _is_valid_proxy(args.proxy):
             print('Setting proxy')
-            download.proxy = args.proxy
+            proxy = args.proxy
         else:
             print('The proxy is not in the right format and it will not be used.')
 
-    if args.all:
-        download.download_all_chapters = True
+    request = DownloadRequest(
+        title=args.manga_title.strip(),
+        source=source,
+        output=args.out.strip(),
+        pdf=args.pdf or False,
+        proxy=proxy,
+        enable_debug_log=args.debug,
+        download_all_chapters=bool(args.all),
+        download_single_chapter=_parse_single_chapter(args.chapter),
+        download_chapters=_parse_chapter_range(args.chapter),
+        options=None,
+    )
+    DownloadManager().download(request)
 
-    elif args.chapter:
-        chapters = args.chapter.split('-')
-        if len(chapters) == 2:
-            download.download_chapters = args.chapter
-        else:
-            download.download_single_chapter = args.chapter.strip()
-    else:
-        download.download_last_chapter = True
 
-    start_download(download)
+def _parse_chapter_range(value: str | None) -> str | None:
+    if not value:
+        return None
+    parts = value.split('-')
+    if len(parts) == 2:
+        return value
+    return None
 
 
-def start_download(download: MangaDownload):
-    if download.enable_debug_log:
-        log.setLevel(logging.DEBUG)
-    else:
-        log.setLevel(logging.ERROR)
+def _parse_single_chapter(value: str | None) -> str | None:
+    if not value:
+        return None
+    parts = value.split('-')
+    if len(parts) == 2:
+        return None
+    return value.strip()
 
-    headers = None
 
-    if download.source is None:
-        repository = FanFoxRepository()
-        repository_directory = 'fanfox'
-        headers = {"Referer": "http://fanfox.net/"}
-        max_workers = 1  # to avoid bot detection
-    else:
-        source = download.source.strip().lower()
-        if source == 'fanfox':
-            repository = FanFoxRepository()
-            repository_directory = source
-            max_workers = 1  # to avoid bot detection
-            headers = {"Referer": "{0}".format(repository.base_url)}
-        else:
-            sys.exit('Source {0} is missing'.format(source))
+def _is_valid_proxy(proxy_info: dict) -> bool:
+    return 'http' in proxy_info.keys() and 'https' in proxy_info.keys()
 
-    if download.proxy:
-        repository.proxies = download.proxy
 
-    print('🔎  Searching for {0} in {1}...'.format(download.title, download.source))
-    try:
-        manga = repository.search(download.title)
-    except Exception as e:
-        logging.error(str(e))
-        return
+def _normalize_source(source: str) -> str:
+    return source.strip().lower()
 
-    if manga is None or len(manga.chapters) <= 0:
-        print('❌  Manga {0} doesn\'t exist.'.format(download.title))
-        return
 
-    print('✅  {0} found'.format(manga.title))
-    directory = os.path.join(download.output, repository_directory, manga.subdirectory)
-    chapters = []
+def _normalize_yaml_downloads(dictionary: dict) -> list[dict]:
+    if 'downloads' in dictionary and isinstance(dictionary['downloads'], list):
+        return list(dictionary['downloads'])
 
-    if download.download_all():
-        chapters = manga.chapters
+    downloads = []
+    for key, value in dictionary.items():
+        if key in {'debug', 'output', 'proxy'}:
+            continue
+        if isinstance(value, list):
+            for entry in value:
+                entry_with_source = dict(entry)
+                entry_with_source.setdefault('source', key)
+                downloads.append(entry_with_source)
+    return downloads
 
-    elif download.download_single() is not None:
-        download_chapter = download.download_single()
-        for chapter in manga.chapters:
-            if chapter.number == download_chapter:
-                chapters.append(chapter)
-                break
-        else:
-            logging.error("❌  Chapter doesn't exist.")
-            return
 
-    elif download.download_range() is not None:
-        range = download.download_range()
-        range_begin = range[0]
-        range_end = range[1]
-        start = None
-        stop = None
-        for index, chapter in enumerate(manga.chapters):
-            if chapter.number == range_begin:
-                start = index
-            if range_end is not None and chapter.number == range_end:
-                stop = index + 1
-        for chapter in manga.chapters[start:stop]:
-            chapters.append(chapter)
-
-    else:  # manga._download_last()
-        last_chapter = manga.last_chapter
-        chapters.append(last_chapter)
-
-    print('⬇️  Download started.')
-    archiver = ChapterArchiver(directory, max_workers=max_workers)
-    for chapter in chapters:
-        try:
-            archiver.archive(chapter, download.save_as_pdf(), headers)
-        except Exception as e:
-            logging.error(str(e))
-
-    print('🎉  Download finished.')
+def _extract_options(entry: dict) -> dict | None:
+    options = {}
+    for key in ("translated_language", "content_rating", "data_saver"):
+        if key in entry:
+            options[key] = entry.get(key)
+    return options or None
 
 
 if __name__ == '__main__':

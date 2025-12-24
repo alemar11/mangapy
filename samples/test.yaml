@@ -4,13 +4,16 @@
 #  proxy: # optional
 #   http: "http://31.14.131.70:8080"
 #   https: "http://31.14.131.70:8080" 
- fanfox:
-  - title: "bleach"
+ downloads:
+  - source: "fanfox"
+    title: "bleach"
     pdf: true
     download_single_chapter: "10"
-  - title: "naruto"
+  - source: "fanfox"
+    title: "naruto"
     pdf: true
     download_chapters: "10-13"
-  - title: "black clover"
+  - source: "fanfox"
+    title: "black clover"
     download_all_chapters: True
     pdf: true

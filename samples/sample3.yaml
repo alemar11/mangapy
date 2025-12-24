@@ -1,7 +1,8 @@
 --- 
  debug: true # optional
  output: "~/Downloads/Mangapy_sample3"
- fanfox:
-   - title: "Ahiru no Sora"
+ downloads:
+   - source: "fanfox"
+     title: "Ahiru no Sora"
      pdf: true
      download_chapters: "152.3-180"
