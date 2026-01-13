@@ -70,6 +70,7 @@ def test_main_title_accepts_valid_proxy(monkeypatch):
         proxy={"http": "h", "https": "s"},
         all=False,
         chapter=None,
+        no_progress=False,
     )
 
     cli.main_title(args)
@@ -88,6 +89,7 @@ def test_main_title_rejects_proxy_missing_http(monkeypatch):
         proxy={"https": "s"},
         all=False,
         chapter=None,
+        no_progress=False,
     )
 
     cli.main_title(args)
@@ -106,6 +108,7 @@ def test_main_title_source_and_range(monkeypatch):
         proxy=None,
         all=False,
         chapter="1-3",
+        no_progress=False,
     )
 
     cli.main_title(args)
@@ -169,6 +172,7 @@ def test_main_yaml_downloads_list(monkeypatch, tmp_path):
                 "translated_language": ["it"],
                 "content_rating": "safe",
                 "data_saver": True,
+                "no_progress": True,
             },
             {"title": ""},
             {
@@ -192,6 +196,7 @@ def test_main_yaml_downloads_list(monkeypatch, tmp_path):
     assert first.output == "/tmp/root"
     assert first.proxy == {"http": "h", "https": "s"}
     assert first.download_all_chapters is True
+    assert first.no_progress is True
     assert first.options == {
         "translated_language": ["it"],
         "content_rating": "safe",

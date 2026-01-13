@@ -18,6 +18,7 @@ class DownloadRequest:
     pdf: bool = False
     proxy: dict | None = None
     no_retry: bool = False
+    no_progress: bool = False
     enable_debug_log: bool = False
     download_all_chapters: bool = False
     download_last_chapter: bool = False
@@ -95,12 +96,18 @@ class DownloadManager:
                             request.pdf,
                             headers,
                             retry_enabled=not request.no_retry,
+                            show_progress=not request.no_progress,
                         ),
                         chapters,
                     )
                 )
         else:
-            archiver = ChapterArchiver(directory, max_workers=max_parallel_pages, retry_enabled=not request.no_retry)
+            archiver = ChapterArchiver(
+                directory,
+                max_workers=max_parallel_pages,
+                retry_enabled=not request.no_retry,
+                show_progress=not request.no_progress,
+            )
             for chapter in chapters:
                 _archive_with_archiver(archiver, chapter, request.pdf, headers)
 
@@ -114,8 +121,14 @@ def _archive_chapter(
     pdf: bool,
     headers,
     retry_enabled: bool,
+    show_progress: bool,
 ):
-    archiver = ChapterArchiver(directory, max_workers=max_parallel_pages, retry_enabled=retry_enabled)
+    archiver = ChapterArchiver(
+        directory,
+        max_workers=max_parallel_pages,
+        retry_enabled=retry_enabled,
+        show_progress=show_progress,
+    )
     _archive_with_archiver(archiver, chapter, pdf, headers)
 
 

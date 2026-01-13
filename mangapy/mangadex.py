@@ -196,7 +196,11 @@ class MangadexChapter(Chapter):
         if not self.chapter_uuid:
             return []
         if self._requester is None:
-            response = requests.get(self.first_page_url, timeout=(10, 30))
+            response = requests.get(
+                self.first_page_url,
+                timeout=(10, 30),
+                headers={"Accept": "application/json", "User-Agent": "mangapy"},
+            )
             if response.status_code != 200:
                 return []
             payload = response.json()

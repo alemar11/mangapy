@@ -48,6 +48,12 @@ Disable network retries (useful for benchmarking).
 mangapy title bleach -c 1 -o ~/Downloads --no-retry
 ```
 
+Disable progress output.
+
+```
+mangapy title bleach -c 1 -o ~/Downloads --no-progress
+```
+
 You may need a proxy to download certain manga, to do so use the option *-p or --proxy*:
 Downloads the last One Piece chapter as images inside the *Downloads* folder (from Fanfox source) using the proxy during the search.  
 
@@ -78,6 +84,7 @@ uv run python3 scripts/dev_run.py <sample-filename.yaml>
 --- 
  debug: true # optional
  no_retry: false # optional, disable retries
+ no_progress: false # optional, disable progress output
  output: "~/Downloads/mangapy"
  proxy: # optional
   http: "http://31.14.131.70:8080"

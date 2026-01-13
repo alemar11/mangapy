@@ -2,6 +2,7 @@ import logging
 import os
 import random
 import re
+import sys
 import requests
 import shutil
 import threading
@@ -20,10 +21,11 @@ tqdm.set_lock(threading.RLock())
 
 
 class ChapterArchiver(object):
-    def __init__(self, path: str, max_workers=1, retry_enabled: bool = True):
+    def __init__(self, path: str, max_workers=1, retry_enabled: bool = True, show_progress: bool = True):
         self.max_workers = max_workers
         self.path = Path(path).expanduser()
         self.retry_enabled = retry_enabled
+        self.show_progress = show_progress
         self._session_local = threading.local()
         self._pdf_lock_guard = threading.Lock()
         self._pdf_locks = {}
@@ -178,8 +180,16 @@ class ChapterArchiver(object):
         description = ('Chapter {0}'.format(chapter_name))
         func = partial(self._save_image, chapter_images_path, headers)  # currying
 
+        disable_progress = (not self.show_progress) or (not sys.stderr.isatty())
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            for _ in tqdm(executor.map(func, pages), total=len(pages), desc=description, unit='pages', ncols=100):
+            for _ in tqdm(
+                executor.map(func, pages),
+                total=len(pages),
+                desc=description,
+                unit='pages',
+                ncols=100,
+                disable=disable_progress,
+            ):
                 pass
 
 
