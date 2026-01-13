@@ -77,7 +77,7 @@ class FanFoxRepository(MangaRepository):
             return manga_chapters
         chapters = list_detail.find_all('a', href=True)
         chapters_url = map(lambda c: c['href'], reversed(chapters))
-         
+
         for url in chapters_url:
             chapter_id = url.split("/")[-2][1:]  # relative url, TODO: regex
             absolute_url = "{0}{1}".format(self.base_url, url)
