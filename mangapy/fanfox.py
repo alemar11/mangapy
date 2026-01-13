@@ -109,7 +109,10 @@ class FanFoxRepository(MangaRepository):
         return self._fetch_manga(match_url, match_title)
 
     def _fetch_manga(self, manga_url: str, fallback_title: str) -> Manga | None:
-        response = self.session.get(url=manga_url)
+        try:
+            response = self.session.get(url=manga_url, timeout=(10, 30))
+        except requests.RequestException:
+            return None
         if response is None or response.status_code != 200:
             return None
 
@@ -150,7 +153,10 @@ class FanFoxRepository(MangaRepository):
         return Manga(fallback_title, sorted_chapters)
 
     def _search_manga(self, manga_name: str) -> tuple[str, str] | None:
-        response = self.session.get(f"{self.base_url}/search", params={"title": manga_name})
+        try:
+            response = self.session.get(f"{self.base_url}/search", params={"title": manga_name}, timeout=(10, 30))
+        except requests.RequestException:
+            return None
         if response is None or response.status_code != 200:
             return None
 
@@ -201,6 +207,8 @@ class FanFoxChapter(Chapter):
         if unpacked is None:
             raise ValueError("Packed JS not found for key")
         key_match = re.search(r'(?<=var guidkey=)(.*)(?=\';)', unpacked)
+        if not key_match:
+            return ""
         key = key_match.group(1)
         key = key.replace('\'', '')
         key = key.replace('\\', '')
@@ -225,7 +233,10 @@ class FanFoxChapter(Chapter):
     def _one_link_helper(self, page, base_url, cid, key):
         final_url = '{}/chapterfun.ashx?cid={}&page={}&key={}'.format(base_url, cid, page, key)
         session = self._session_provider()
-        response = session.get(final_url)
+        try:
+            response = session.get(final_url, timeout=(10, 30))
+        except requests.RequestException:
+            return None
 
         if response is None or response.status_code != 200:
             return None
@@ -234,14 +245,20 @@ class FanFoxChapter(Chapter):
         return content
 
     def _parse_links(self, data):
-        base_path = re.search(r'pix="(.+?)"', data).group(1)
+        base_match = re.search(r'pix="(.+?)"', data)
+        if not base_match:
+            return []
+        base_path = base_match.group(1)
         images = re.findall(r'"(/\w.+?)"', data)
         return [base_path + i for i in images]
 
     def pages(self) -> List[Page]:
         base_url = self.first_page_url[:self.first_page_url.rfind('/')]
         session = self._session_provider()
-        response = session.get(self.first_page_url)
+        try:
+            response = session.get(self.first_page_url, timeout=(10, 30))
+        except requests.RequestException:
+            return None
 
         if response is None or response.status_code != 200:
             return None
@@ -275,9 +292,15 @@ class FanFoxChapter(Chapter):
             scripts = soup.find_all("script", {"type": "text/javascript"})
             if not scripts:
                 return []
-            eval_script = next((script for script in scripts if script.text.startswith("eval")), None).text
+            eval_node = next((script for script in scripts if script.text.startswith("eval")), None)
+            if not eval_node or not eval_node.text:
+                return []
+            eval_script = eval_node.text
             images_content = self._get_urls(eval_script)
-            links = re.search(r'(?<=newImgs=\[)[^]]+(?=\])', images_content).group(0).split(',')
+            links_match = re.search(r'(?<=newImgs=\[)[^]]+(?=\])', images_content)
+            if not links_match:
+                return []
+            links = links_match.group(0).split(',')
             for i, link in enumerate(links):
                 formatted_link = link.replace("'", "")
                 pages.append(Page(i, formatted_link))

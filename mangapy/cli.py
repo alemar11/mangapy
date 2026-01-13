@@ -30,6 +30,7 @@ def cmd_parse():
     args_parser.add_argument('-o', '--out', type=str, default=default_path_to_download_folder, help='download directory')
     args_parser.add_argument('-d', '--debug', action='store_true', help="set log to DEBUG level")
     args_parser.add_argument('--pdf', action='store_true', help="create a pdf for each chapter")
+    args_parser.add_argument('--no-retry', action='store_true', help="disable network retries")
 
     args_parser.add_argument('-p', '--proxy', type=json.loads, help="use a proxy to download the chapters")
     group = args_parser.add_mutually_exclusive_group()
@@ -75,6 +76,7 @@ def main_yaml(args: argparse.Namespace):
                     print('The proxy is not in the right format and it will not be used.')
 
             debug_log = bool(dictionary.get('debug', False))
+            no_retry = bool(dictionary.get('no_retry', False))
             downloads = _normalize_yaml_downloads(dictionary)
             manager = DownloadManager()
             for entry in downloads:
@@ -87,6 +89,7 @@ def main_yaml(args: argparse.Namespace):
                     output=str(entry.get('output', output)).strip(),
                     pdf=bool(entry.get('pdf', False)),
                     proxy=entry.get('proxy', proxy),
+                    no_retry=bool(entry.get('no_retry', no_retry)),
                     enable_debug_log=bool(entry.get('debug', debug_log)),
                     download_all_chapters=bool(entry.get('download_all_chapters', False)),
                     download_last_chapter=bool(entry.get('download_last_chapter', False)),
@@ -115,6 +118,7 @@ def main_title(args: argparse.Namespace):
         output=args.out.strip(),
         pdf=args.pdf or False,
         proxy=proxy,
+        no_retry=bool(getattr(args, "no_retry", False)),
         enable_debug_log=args.debug,
         download_all_chapters=bool(args.all),
         download_single_chapter=_parse_single_chapter(args.chapter),

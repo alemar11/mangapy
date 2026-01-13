@@ -33,7 +33,7 @@ def test_download_manager_parallel_chapters(monkeypatch):
 
     monkeypatch.setattr("mangapy.download_manager.get_repository", lambda name: repo)
 
-    def fake_archive(directory, max_parallel_pages, chapter, pdf, headers):
+    def fake_archive(directory, max_parallel_pages, chapter, pdf, headers, **kwargs):
         calls.append(chapter.chapter_id)
 
     monkeypatch.setattr("mangapy.download_manager._archive_chapter", fake_archive)

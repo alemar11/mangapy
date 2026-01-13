@@ -13,7 +13,7 @@ class _FakeSession:
     def __init__(self, responses: dict[str, list[_FakeResponse]]):
         self._responses = {key: list(values) for key, values in responses.items()}
 
-    def get(self, url, params=None):
+    def get(self, url, params=None, **kwargs):
         key = url
         if key not in self._responses:
             if "search" in url:

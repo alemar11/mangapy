@@ -14,6 +14,7 @@ class MangadexRepository(MangaRepository):
         self._session_local = threading.local()
         self._rate_lock = threading.Lock()
         self._last_request = 0.0
+        self.no_retry = False
 
     @property
     def capabilities(self) -> ProviderCapabilities:
@@ -121,14 +122,29 @@ class MangadexRepository(MangaRepository):
 
     def _request(self, url: str, params: dict | None = None) -> requests.Response | None:
         session = self._get_session()
+        if self.no_retry:
+            self._apply_rate_limit()
+            try:
+                return session.get(url, params=params, timeout=(10, 30))
+            except requests.RequestException:
+                return None
+        last_error = None
         for attempt in range(3):
             self._apply_rate_limit()
-            response = session.get(url, params=params, timeout=(10, 30))
+            try:
+                response = session.get(url, params=params, timeout=(10, 30))
+            except requests.RequestException as exc:
+                last_error = exc
+                delay = _retry_delay(None, attempt)
+                time.sleep(delay)
+                continue
             if response.status_code == 429 or response.status_code >= 500:
                 delay = _retry_delay(response, attempt)
                 time.sleep(delay)
                 continue
             return response
+        if last_error:
+            return None
         return response
 
     def _apply_rate_limit(self) -> None:
@@ -261,8 +277,9 @@ def _chapter_sort_key(volume: str | None, chapter: str | None, chapter_id: str):
     return (2, chapter_id)
 
 
-def _retry_delay(response: requests.Response, attempt: int) -> float:
-    retry_after = response.headers.get("Retry-After")
-    if retry_after and retry_after.isdigit():
-        return float(retry_after)
+def _retry_delay(response: requests.Response | None, attempt: int) -> float:
+    if response is not None:
+        retry_after = response.headers.get("Retry-After")
+        if retry_after and retry_after.isdigit():
+            return float(retry_after)
     return min(2 ** attempt, 5)

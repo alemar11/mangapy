@@ -17,6 +17,7 @@ class DownloadRequest:
     output: str
     pdf: bool = False
     proxy: dict | None = None
+    no_retry: bool = False
     enable_debug_log: bool = False
     download_all_chapters: bool = False
     download_last_chapter: bool = False
@@ -35,6 +36,8 @@ class DownloadManager:
         repository = get_repository(request.source)
         if request.proxy:
             repository.proxies = request.proxy
+        if hasattr(repository, "no_retry"):
+            repository.no_retry = request.no_retry
 
         print(f"🔎  Searching for {request.title} in {request.source}...")
         try:
@@ -85,20 +88,34 @@ class DownloadManager:
             with ThreadPoolExecutor(max_workers=repository.capabilities.max_parallel_chapters) as executor:
                 list(
                     executor.map(
-                        lambda ch: _archive_chapter(directory, max_parallel_pages, ch, request.pdf, headers),
+                        lambda ch: _archive_chapter(
+                            directory,
+                            max_parallel_pages,
+                            ch,
+                            request.pdf,
+                            headers,
+                            retry_enabled=not request.no_retry,
+                        ),
                         chapters,
                     )
                 )
         else:
-            archiver = ChapterArchiver(directory, max_workers=max_parallel_pages)
+            archiver = ChapterArchiver(directory, max_workers=max_parallel_pages, retry_enabled=not request.no_retry)
             for chapter in chapters:
                 _archive_with_archiver(archiver, chapter, request.pdf, headers)
 
         print("🎉  Download finished.")
 
 
-def _archive_chapter(directory: str, max_parallel_pages: int, chapter: Chapter, pdf: bool, headers):
-    archiver = ChapterArchiver(directory, max_workers=max_parallel_pages)
+def _archive_chapter(
+    directory: str,
+    max_parallel_pages: int,
+    chapter: Chapter,
+    pdf: bool,
+    headers,
+    retry_enabled: bool,
+):
+    archiver = ChapterArchiver(directory, max_workers=max_parallel_pages, retry_enabled=retry_enabled)
     _archive_with_archiver(archiver, chapter, pdf, headers)
 
 
