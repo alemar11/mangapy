@@ -1,9 +1,12 @@
 import logging
 import os
+import random
 import re
+import sys
 import requests
 import shutil
 import threading
+import time
 from collections.abc import Mapping
 from functools import partial
 from tqdm import tqdm
@@ -18,9 +21,11 @@ tqdm.set_lock(threading.RLock())
 
 
 class ChapterArchiver(object):
-    def __init__(self, path: str, max_workers=1):
+    def __init__(self, path: str, max_workers=1, retry_enabled: bool = True, show_progress: bool = True):
         self.max_workers = max_workers
         self.path = Path(path).expanduser()
+        self.retry_enabled = retry_enabled
+        self.show_progress = show_progress
         self._session_local = threading.local()
         self._pdf_lock_guard = threading.Lock()
         self._pdf_locks = {}
@@ -51,10 +56,35 @@ class ChapterArchiver(object):
 
     def _fetch_image(self, url: str, headers: Mapping[str, str | bytes | None] | None):
         session = self._get_session()
-        response = session.get(url, headers=headers, timeout=(10, 30))
-        if response.status_code != 200:
+        if not self.retry_enabled:
+            try:
+                response = session.get(url, headers=headers, timeout=(10, 30))
+            except requests.RequestException as exc:
+                logging.error("Failed to download image %s: %s", url, exc)
+                return None
+            if response.status_code != 200:
+                return None
+            return response.content
+
+        last_error = None
+        for attempt in range(3):
+            try:
+                response = session.get(url, headers=headers, timeout=(10, 30))
+            except requests.RequestException as exc:
+                last_error = exc
+                time.sleep(_retry_delay(attempt))
+                continue
+
+            if response.status_code == 200:
+                return response.content
+            if response.status_code == 429 or response.status_code >= 500:
+                time.sleep(_retry_delay(attempt, response))
+                continue
             return None
-        return response.content
+
+        if last_error:
+            logging.error("Failed to download image %s: %s", url, last_error)
+        return None
 
     def _save_image(self, image_path: Path, headers: Mapping[str, str | bytes | None] | None, page: Page):
         file_name = str(page.number)
@@ -65,7 +95,7 @@ class ChapterArchiver(object):
             return  # early exit if the file is already on disk
 
         if image_url.startswith('//'):
-            image_url = 'http:' + image_url
+            image_url = 'https:' + image_url
 
         data = self._fetch_image(image_url, headers=headers)
 
@@ -73,14 +103,18 @@ class ChapterArchiver(object):
             logging.error("Can't download page {0}".format(file_name))
             return
 
-        output = open(file_path, "wb")
-        output.write(data)
-        output.close()
+        with open(file_path, "wb") as output:
+            output.write(data)
 
     def _create_chapter_pdf(self, chapter_images_path: Path, pdf_path: Path):
-        file_list = list(chapter_images_path.glob('**/*'))  # we don't care of their ext
+        file_list = [path for path in chapter_images_path.glob('**/*') if path.is_file()]
         chapter_images_path = list(map(lambda path: str(path.absolute()), file_list))
         images_path = natural_sort(chapter_images_path)
+
+        tmp_path = pdf_path.with_name(pdf_path.name + ".tmp")
+        if _try_img2pdf(images_path, tmp_path):
+            tmp_path.replace(pdf_path)
+            return
 
         images = []
         for path in images_path:
@@ -94,7 +128,6 @@ class ChapterArchiver(object):
         if images_count <= 0:
             return
         first_image = images.pop(0)
-        tmp_path = pdf_path.with_name(pdf_path.name + ".tmp")
         try:
             if images_count == 1:
                 first_image.save(tmp_path, "PDF", resolution=100.0, save_all=True)
@@ -147,8 +180,16 @@ class ChapterArchiver(object):
         description = ('Chapter {0}'.format(chapter_name))
         func = partial(self._save_image, chapter_images_path, headers)  # currying
 
+        disable_progress = (not self.show_progress) or (not sys.stderr.isatty())
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            for _ in tqdm(executor.map(func, pages), total=len(pages), desc=description, unit='pages', ncols=100):
+            for _ in tqdm(
+                executor.map(func, pages),
+                total=len(pages),
+                desc=description,
+                unit='pages',
+                ncols=100,
+                disable=disable_progress,
+            ):
                 pass
 
 
@@ -160,3 +201,29 @@ def natural_sort(list):
         return [convert(c) for c in re.split('([0-9]+)', key)]
 
     return sorted(list, key=alphanum_key)
+
+
+def _retry_delay(attempt: int, response: requests.Response | None = None) -> float:
+    if response is not None:
+        retry_after = response.headers.get("Retry-After")
+        if retry_after and retry_after.isdigit():
+            return float(retry_after)
+    base = min(2 ** attempt, 5)
+    return base + random.uniform(0, 0.2)
+
+
+def _try_img2pdf(image_paths: list[str], tmp_path: Path) -> bool:
+    if not image_paths:
+        return False
+    try:
+        import img2pdf
+    except Exception:
+        return False
+
+    try:
+        with open(tmp_path, "wb") as output:
+            output.write(img2pdf.convert(image_paths, dpi=100))
+        return True
+    except Exception as exc:
+        logging.warning("img2pdf failed, falling back to PIL: %s", exc)
+        return False

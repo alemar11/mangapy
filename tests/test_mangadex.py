@@ -5,14 +5,24 @@ from mangapy.mangadex import MangadexChapter, MangadexRepository
 
 def _latest_en_chapter():
     url = "https://api.mangadex.org/chapter"
-    params = {"translatedLanguage[]": ["en"], "order[readableAt]": "desc", "limit": 1}
+    params = {"translatedLanguage[]": ["en"], "order[readableAt]": "desc", "limit": 10}
     response = requests.get(url, params=params, timeout=(10, 30))
     response.raise_for_status()
     payload = response.json()
     data = payload.get("data", [])
     if not data:
         return None
-    chapter = data[0]
+    chapter = None
+    for candidate in data:
+        attributes = candidate.get("attributes", {})
+        if attributes.get("externalUrl"):
+            continue
+        if (attributes.get("pages") or 0) <= 0:
+            continue
+        chapter = candidate
+        break
+    if chapter is None:
+        return None
     manga_id = None
     for rel in chapter.get("relationships", []):
         if rel.get("type") == "manga":
