@@ -2,41 +2,59 @@ name: Python package
 
 on:
   schedule:
-    - cron:  '* 23 */2 * *' # At the end of every 2 days
+    - cron: "0 23 */2 * *"
   push:
     branches:
       - master
   pull_request:
     branches:
       - master
+  workflow_dispatch:
 
 jobs:
-  build:
-
+  offline-tests:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     strategy:
-      max-parallel: 2
+      fail-fast: false
       matrix:
-        python-version: [3.7, 3.8]
+        python-version: ["3.11", "3.13"]
 
     steps:
-    - uses: actions/checkout@v1
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v1
-      with:
-        python-version: ${{ matrix.python-version }}
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install .
-    - name: Lint with flake8
-      run: |
-        pip install flake8
-        # stop the build if there are Python syntax errors or undefined names
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-    - name: Test with pytest
-      run: |
-        pip install pytest
-        pytest
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+      - uses: astral-sh/setup-uv@v8.1.0
+        with:
+          enable-cache: true
+      - name: Check lockfile
+        run: uv lock --check
+      - name: Run offline tests
+        run: >
+          uv run --locked pytest -q
+          tests/test_cli.py
+          tests/test_providers.py
+          tests/test_download_manager.py
+          tests/test_chapter_archiver.py
+          tests/test_thread_safety.py
+          tests/test_fanfox_search.py
+          tests/test_fanfox_packed_js.py
+          tests/test_sort_key.py
+
+  live-provider-tests:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - uses: astral-sh/setup-uv@v8.1.0
+        with:
+          enable-cache: true
+      - name: Check lockfile
+        run: uv lock --check
+      - name: Run live provider tests
+        run: uv run --locked pytest -q tests/test_fanfox.py tests/test_mangadex.py

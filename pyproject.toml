@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mangapy"
-version = "3.0.1"
+version = "3.0.2"
 description = "Manga downloader"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -22,7 +22,7 @@ classifiers = [
 ]
 dependencies = [
   "bs4",
-  "img2pdf",
+  "img2pdf<0.4",
   "pillow",
   "pyyaml",
   "requests",

@@ -11,6 +11,12 @@ Manga downloader supporting the following sources:
 pipx install mangapy
 ```
 
+Or, on macOS with Homebrew:
+
+```
+brew install alemar11/tap/mangapy
+```
+
 ## Usage
 
 ### Terminal
