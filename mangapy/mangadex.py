@@ -25,29 +25,45 @@ class MangadexRepository(MangaRepository):
         translated_language = _normalize_list_option(options.get("translated_language")) or ["en"]
         content_rating = _normalize_list_option(options.get("content_rating")) or ["safe", "suggestive", "erotica"]
         data_saver = bool(options.get("data_saver", False))
-        params = {"limit": 10, "title": title}
-        payload = self._request_json(f"{self.base_url}/manga", params=params)
-        if payload is None:
-            return None
-        results = payload.get("data", [])
+        results = self._search_manga_results(title)
         if not results:
             return None
 
         normalized_query = _normalize_title(title)
         best = None
+        partial_matches = []
         for item in results:
             attributes = item.get("attributes", {})
             if _title_matches(attributes, normalized_query):
                 best = item
                 break
+            if _title_partially_matches(attributes, normalized_query):
+                partial_matches.append(item)
         if best is None:
-            best = results[0]
+            if not partial_matches:
+                return None
+            best = partial_matches[0]
 
         attributes = best.get("attributes", {})
         manga_title = _pick_title(attributes) or title
         manga_id = best.get("id")
         chapters = self._fetch_chapters(manga_id, translated_language, content_rating, data_saver)
         return MangadexManga(manga_id, manga_title, chapters)
+
+    def suggestions(self, title: str, options: dict | None = None) -> list[str]:
+        suggestions = []
+        for item in self._search_manga_results(title)[:5]:
+            suggestion = _pick_title(item.get("attributes", {}))
+            if suggestion:
+                suggestions.append(suggestion)
+        return suggestions
+
+    def _search_manga_results(self, title: str) -> list[dict]:
+        params = {"limit": 10, "title": title}
+        payload = self._request_json(f"{self.base_url}/manga", params=params)
+        if payload is None:
+            return []
+        return payload.get("data", [])
 
     def _fetch_chapters(
         self,
@@ -248,6 +264,20 @@ def _title_matches(attributes: dict, normalized_query: str) -> bool:
     for alt in attributes.get("altTitles", []) or []:
         for candidate in alt.values():
             if _normalize_title(candidate) == normalized_query:
+                return True
+    return False
+
+
+def _title_partially_matches(attributes: dict, normalized_query: str) -> bool:
+    if not normalized_query:
+        return False
+    title = attributes.get("title") or {}
+    for candidate in title.values():
+        if normalized_query in _normalize_title(candidate):
+            return True
+    for alt in attributes.get("altTitles", []) or []:
+        for candidate in alt.values():
+            if normalized_query in _normalize_title(candidate):
                 return True
     return False
 

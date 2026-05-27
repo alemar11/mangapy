@@ -50,6 +50,9 @@ class MangaRepository(ABC):
     def image_request_headers(self) -> dict[str, str] | None:
         return None
 
+    def suggestions(self, title: str, options: dict | None = None) -> list[str]:
+        return []
+
     @abstractmethod
     def search(self, title, options: dict | None = None) -> List[Manga] | Manga | None:
         pass

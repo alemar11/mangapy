@@ -28,7 +28,7 @@ def test_archive_uses_normalized_chapter_dir(tmp_path, monkeypatch):
 
 
 def _png_bytes():
-    image = Image.new("RGB", (1, 1), color=(255, 0, 0))
+    image = Image.new("RGB", (10, 10), color=(255, 0, 0))
     buf = BytesIO()
     image.save(buf, format="PNG")
     return buf.getvalue()

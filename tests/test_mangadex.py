@@ -72,3 +72,62 @@ def test_fetch_manga_chapter_pages():
     pages = chapter.pages()
     assert pages
     assert pages[0].url.startswith("https://")
+
+
+def test_mangadex_suggestions_use_search_titles(monkeypatch):
+    repo = MangadexRepository()
+
+    def fake_request_json(url, params=None):
+        return {
+            "data": [
+                {"attributes": {"title": {"en": "One Piece"}}},
+                {"attributes": {"title": {"ja-ro": "One Punch-Man"}}},
+            ]
+        }
+
+    monkeypatch.setattr(repo, "_request_json", fake_request_json)
+
+    assert repo.suggestions("one") == ["One Piece", "One Punch-Man"]
+
+
+def test_mangadex_search_returns_partial_title_match(monkeypatch):
+    repo = MangadexRepository()
+
+    def fake_request_json(url, params=None):
+        return {
+            "data": [
+                {
+                    "id": "manga-1",
+                    "attributes": {
+                        "title": {"en": "One Piece"},
+                        "altTitles": [{"en": "Wan Pisu"}],
+                    },
+                }
+            ]
+        }
+
+    monkeypatch.setattr(repo, "_request_json", fake_request_json)
+    monkeypatch.setattr(repo, "_fetch_chapters", lambda *args: [])
+
+    manga = repo.search("one")
+
+    assert manga is not None
+    assert manga.title == "One Piece"
+
+
+def test_mangadex_search_returns_none_without_title_match(monkeypatch):
+    repo = MangadexRepository()
+
+    def fake_request_json(url, params=None):
+        return {
+            "data": [
+                {
+                    "id": "manga-1",
+                    "attributes": {"title": {"en": "One Piece"}},
+                }
+            ]
+        }
+
+    monkeypatch.setattr(repo, "_request_json", fake_request_json)
+
+    assert repo.search("zzzzzz") is None

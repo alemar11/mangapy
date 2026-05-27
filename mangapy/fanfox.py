@@ -2,6 +2,7 @@ import ast
 import re
 import requests
 import threading
+from difflib import SequenceMatcher
 from mangapy import log
 from mangapy.mangarepository import MangaRepository, Manga, Chapter, Page
 from mangapy.capabilities import ProviderCapabilities
@@ -153,26 +154,7 @@ class FanFoxRepository(MangaRepository):
         return Manga(fallback_title, sorted_chapters)
 
     def _search_manga(self, manga_name: str) -> tuple[str, str] | None:
-        try:
-            response = self.session.get(f"{self.base_url}/search", params={"title": manga_name}, timeout=(10, 30))
-        except requests.RequestException:
-            return None
-        if response is None or response.status_code != 200:
-            return None
-
-        soup = BeautifulSoup(response.text, features="html.parser")
-        results: list[tuple[str, str]] = []
-        for item in soup.select("ul.manga-list-4-list li"):
-            title_link = item.select_one("p.manga-list-4-item-title a")
-            if not title_link:
-                continue
-            title = title_link.get_text(strip=True)
-            href = title_link.get("href")
-            if not title or not href:
-                continue
-            url = href if href.startswith("http") else f"{self.base_url}{href}"
-            results.append((title, url))
-
+        results = self._search_manga_results(manga_name)
         if not results:
             return None
 
@@ -189,6 +171,38 @@ class FanFoxRepository(MangaRepository):
             return partial_matches[0]
 
         return None
+
+    def suggestions(self, title: str, options: dict | None = None) -> list[str]:
+        normalized_query = _normalize_title(title)
+        results = sorted(
+            self._search_manga_results(title),
+            key=lambda result: SequenceMatcher(None, normalized_query, _normalize_title(result[0])).ratio(),
+            reverse=True,
+        )
+        return [result_title for result_title, _ in results[:5]]
+
+    def _search_manga_results(self, manga_name: str) -> list[tuple[str, str]]:
+        try:
+            response = self.session.get(f"{self.base_url}/search", params={"title": manga_name}, timeout=(10, 30))
+        except requests.RequestException:
+            return []
+        if response is None or response.status_code != 200:
+            return []
+
+        soup = BeautifulSoup(response.text, features="html.parser")
+        results: list[tuple[str, str]] = []
+        for item in soup.select("ul.manga-list-4-list li"):
+            title_link = item.select_one("p.manga-list-4-item-title a")
+            if not title_link:
+                continue
+            title = title_link.get_text(strip=True)
+            href = title_link.get("href")
+            if not title or not href:
+                continue
+            url = href if href.startswith("http") else f"{self.base_url}{href}"
+            results.append((title, url))
+
+        return results
 
 
 class FanFoxChapter(Chapter):

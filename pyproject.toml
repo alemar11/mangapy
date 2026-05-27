@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mangapy"
-version = "3.0.2"
+version = "4.0.0"
 description = "Manga downloader"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -21,11 +21,11 @@ classifiers = [
   "Intended Audience :: End Users/Desktop",
 ]
 dependencies = [
-  "bs4",
-  "img2pdf<0.4",
-  "pyyaml",
-  "requests",
-  "tqdm",
+  "beautifulsoup4>=4.14.3",
+  "img2pdf>=0.6.3",
+  "pyyaml>=6.0.3",
+  "requests>=2.34.2",
+  "tqdm>=4.67.3",
 ]
 
 [project.scripts]
@@ -33,10 +33,10 @@ mangapy = "mangapy.cli:main"
 
 [dependency-groups]
 dev = [
-  "flake8",
-  "pylint",
-  "pytest",
-  "rope",
+  "flake8>=7.3.0",
+  "pylint>=4.0.5",
+  "pytest>=9.0.3",
+  "rope>=1.14.0",
 ]
 
 [tool.setuptools.packages.find]

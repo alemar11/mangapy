@@ -1,5 +1,5 @@
 from mangapy.capabilities import ProviderCapabilities
-from mangapy.download_manager import DownloadManager, DownloadRequest, _archive_chapter, _archive_with_archiver
+from mangapy.download_manager import DownloadManager, DownloadRequest
 from mangapy.mangarepository import Manga, Chapter, Page
 
 
@@ -25,6 +25,21 @@ class DummyRepo:
 
     def search(self, title, options=None):
         return Manga(title, [DummyChapter("1", 1.0), DummyChapter("2", 2.0)])
+
+    def suggestions(self, title, options=None):
+        return []
+
+
+class MissingRepo(DummyRepo):
+    def __init__(self, suggestions: list[str]):
+        super().__init__(max_parallel_chapters=1)
+        self._suggestions = suggestions
+
+    def search(self, title, options=None):
+        return None
+
+    def suggestions(self, title, options=None):
+        return self._suggestions
 
 
 def test_download_manager_parallel_chapters(monkeypatch):
@@ -69,3 +84,21 @@ def test_download_manager_sequential_chapters(monkeypatch):
     DownloadManager().download(request)
 
     assert sorted(calls) == ["1", "2"]
+
+
+def test_download_manager_prints_suggestions_for_missing_manga(monkeypatch, capsys):
+    repo = MissingRepo(["One Piece", "One Punch-Man"])
+    monkeypatch.setattr("mangapy.download_manager.get_repository", lambda name: repo)
+
+    request = DownloadRequest(
+        title="one pice",
+        source="fanfox",
+        output="/tmp",
+    )
+    DownloadManager().download(request)
+
+    output = capsys.readouterr().out
+    assert "Manga one pice doesn't exist" in output
+    assert "Did you mean one of these?" in output
+    assert "One Piece" in output
+    assert "One Punch-Man" in output

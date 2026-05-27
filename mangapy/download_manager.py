@@ -41,31 +41,8 @@ class DownloadManager:
             repository.no_retry = request.no_retry
 
         print(f"🔎  Searching for {request.title} in {request.source}...")
-        try:
-            manga = repository.search(request.title, options=request.options)
-        except Exception as exc:
-            logging.error(str(exc))
-            return
-
-        if manga is None or len(manga.chapters) <= 0:
-            if manga is None:
-                print(f"❌  Manga {request.title} doesn't exist.")
-                return
-            if request.source == "mangadex":
-                options = request.options or {}
-                languages = _normalize_option_list(options.get("translated_language"), ["en"])
-                ratings = _normalize_option_list(options.get("content_rating"), ["safe", "suggestive", "erotica"])
-                language_display = ", ".join(languages) if languages else "none"
-                rating_display = ", ".join(ratings) if ratings else "none"
-                print(
-                    f"❌  {manga.title} found, but no chapters matched the requested language(s): {language_display}."
-                )
-                print(
-                    "ℹ️  Try a different language via YAML (translated_language) or adjust content_rating: "
-                    f"{rating_display}."
-                )
-                return
-            print(f"❌  Manga {request.title} has no chapters available.")
+        manga = _search_manga(repository, request)
+        if manga is None:
             return
 
         print(f"✅  {manga.title} found")
@@ -137,6 +114,47 @@ def _archive_with_archiver(archiver: ChapterArchiver, chapter: Chapter, pdf: boo
         archiver.archive(chapter, pdf, headers)
     except Exception as exc:
         logging.error(str(exc))
+
+
+def _search_manga(repository, request: DownloadRequest) -> Manga | None:
+    try:
+        manga = repository.search(request.title, options=request.options)
+    except Exception as exc:
+        logging.error(str(exc))
+        return None
+
+    if manga is None:
+        print(f"❌  Manga {request.title} doesn't exist.")
+        _print_suggestions(repository, request.title, request.options)
+        return None
+
+    if len(manga.chapters) > 0:
+        return manga
+
+    if request.source == "mangadex":
+        options = request.options or {}
+        languages = _normalize_option_list(options.get("translated_language"), ["en"])
+        ratings = _normalize_option_list(options.get("content_rating"), ["safe", "suggestive", "erotica"])
+        language_display = ", ".join(languages) if languages else "none"
+        rating_display = ", ".join(ratings) if ratings else "none"
+        print(f"❌  {manga.title} found, but no chapters matched the requested language(s): {language_display}.")
+        print(
+            "ℹ️  Try a different language via YAML (translated_language) or adjust content_rating: "
+            f"{rating_display}."
+        )
+        return None
+
+    print(f"❌  Manga {request.title} has no chapters available.")
+    return None
+
+
+def _print_suggestions(repository, title: str, options: dict | None) -> None:
+    suggestions = repository.suggestions(title, options=options)
+    if not suggestions:
+        return
+    print("💡  Did you mean one of these?")
+    for suggestion in suggestions:
+        print(f"   - {suggestion}")
 
 
 def _select_chapters(manga: Manga, request: DownloadRequest) -> List[Chapter]:
