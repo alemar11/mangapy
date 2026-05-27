@@ -36,8 +36,11 @@ git push origin 3.0.2
 ```
 
 The release workflow validates that the tag matches `pyproject.toml`, builds
-the package, publishes it to PyPI with Trusted Publishing, and updates
-`Formula/mangapy.rb` in `alemar11/homebrew-tap`.
+the package, publishes it to PyPI with Trusted Publishing, updates the
+Homebrew formula URL and checksum, attempts to refresh Python resources, and
+then validates the formula. Homebrew ignores PyPI files uploaded in the last
+24 hours when resolving resources, so same-day releases may keep the existing
+resource blocks if dependencies did not change.
 
 ## Manual build and publish
 
@@ -55,9 +58,11 @@ UV_PUBLISH_TOKEN=... uv publish
 ```
 
 Then update the Homebrew formula in `alemar11/homebrew-tap` to point at the
-matching GitHub tag archive:
+matching GitHub tag archive and refresh resources if dependency pins changed:
 
 ```
+curl -L https://github.com/alemar11/mangapy/archive/refs/tags/3.0.2.tar.gz -o /tmp/mangapy-3.0.2.tar.gz
+shasum -a 256 /tmp/mangapy-3.0.2.tar.gz
 brew update-python-resources --exclude-packages pillow --package-name mangapy --version 3.0.2 Formula/mangapy.rb
 brew audit --strict --online mangapy
 brew install --build-from-source mangapy
