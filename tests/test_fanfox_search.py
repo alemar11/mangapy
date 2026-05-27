@@ -1,5 +1,3 @@
-import pytest
-
 from mangapy.fanfox import FanFoxRepository, FanFoxChapter
 
 
@@ -75,6 +73,22 @@ def test_search_manga_no_match_returns_none():
     match = repo._search_manga("this manga doesn't exist")
 
     assert match is None
+
+
+def test_suggestions_return_search_result_titles():
+    repo = FanFoxRepository()
+    search_html = _search_html(
+        [
+            ("One Piece", "/manga/one_piece/"),
+            ("One Punch-Man", "/manga/onepunch_man/"),
+        ]
+    )
+    session = _FakeSession({"search": [_FakeResponse(200, search_html)]})
+    repo._session_local.session = session
+
+    suggestions = repo.suggestions("one")
+
+    assert suggestions == ["One Piece", "One Punch-Man"]
 
 
 def test_search_fallback_uses_search_results():

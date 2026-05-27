@@ -28,7 +28,14 @@ def test_archive_uses_normalized_chapter_dir(tmp_path, monkeypatch):
 
 
 def _png_bytes():
-    image = Image.new("RGB", (1, 1), color=(255, 0, 0))
+    image = Image.new("RGB", (10, 10), color=(255, 0, 0))
+    buf = BytesIO()
+    image.save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def _transparent_png_bytes():
+    image = Image.new("RGBA", (10, 10), color=(255, 0, 0, 128))
     buf = BytesIO()
     image.save(buf, format="PNG")
     return buf.getvalue()
@@ -50,3 +57,15 @@ def test_archive_pdf_creates_pdf_and_cleans_images(tmp_path, monkeypatch):
 
     assert (tmp_path / "pdf" / "1.pdf").is_file()
     assert not (tmp_path / ".images" / "1").exists()
+
+
+def test_archive_pdf_handles_transparent_png(tmp_path, monkeypatch):
+    archiver = ChapterArchiver(str(tmp_path), max_workers=1)
+    image_bytes = _transparent_png_bytes()
+    monkeypatch.setattr(ChapterArchiver, "_fetch_image", lambda self, url, headers: image_bytes)
+
+    chapter = DummyChapter(2.0, [Page(0, "http://example.com/0.png")])
+    archiver.archive(chapter, pdf=True, headers=None)
+
+    assert (tmp_path / "pdf" / "2.pdf").is_file()
+    assert not (tmp_path / ".images" / "2").exists()
