@@ -23,7 +23,6 @@ classifiers = [
 dependencies = [
   "bs4",
   "img2pdf<0.4",
-  "pillow",
   "pyyaml",
   "requests",
   "tqdm",
