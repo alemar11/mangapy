@@ -1,0 +1,150 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "*.*.*"
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  release:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - uses: astral-sh/setup-uv@v8.1.0
+        with:
+          enable-cache: true
+
+      - name: Validate release tag
+        id: meta
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME}"
+          if [[ ! "${version}" =~ ^[0-9]+[.][0-9]+[.][0-9]+$ ]]; then
+            echo "Release tags must use X.Y.Z format, got ${GITHUB_REF_NAME}" >&2
+            exit 1
+          fi
+          project_version="$(python -c 'import pathlib, tomllib; print(tomllib.loads(pathlib.Path("pyproject.toml").read_text())["project"]["version"])')"
+          if [[ "${version}" != "${project_version}" ]]; then
+            echo "Tag ${version} does not match pyproject.toml version ${project_version}" >&2
+            exit 1
+          fi
+          archive_url="https://github.com/alemar11/mangapy/archive/refs/tags/${version}.tar.gz"
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+          echo "archive_url=${archive_url}" >> "${GITHUB_OUTPUT}"
+
+      - name: Check lockfile
+        run: uv lock --check
+
+      - name: Run offline tests
+        run: >
+          uv run --locked pytest -q
+          tests/test_cli.py
+          tests/test_providers.py
+          tests/test_download_manager.py
+          tests/test_chapter_archiver.py
+          tests/test_thread_safety.py
+          tests/test_fanfox_search.py
+          tests/test_fanfox_packed_js.py
+          tests/test_sort_key.py
+
+      - name: Build distributions
+        run: uv build
+
+      - name: Publish to PyPI
+        run: uv publish --trusted-publishing automatic
+
+      - name: Compute source archive checksum
+        id: archive
+        run: |
+          set -euo pipefail
+          curl --fail --location --silent --show-error \
+            "${{ steps.meta.outputs.archive_url }}" \
+            --output mangapy-${{ steps.meta.outputs.version }}.tar.gz
+          sha256="$(shasum -a 256 mangapy-${{ steps.meta.outputs.version }}.tar.gz | awk '{print $1}')"
+          echo "sha256=${sha256}" >> "${GITHUB_OUTPUT}"
+
+      - name: Check out Homebrew tap
+        uses: actions/checkout@v6
+        with:
+          repository: alemar11/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: homebrew-tap
+
+      - name: Update Homebrew formula
+        working-directory: homebrew-tap
+        run: |
+          set -euo pipefail
+          mkdir -p Formula
+          cat > Formula/mangapy.rb <<'RUBY'
+          class Mangapy < Formula
+            include Language::Python::Virtualenv
+
+            desc "Manga downloader"
+            homepage "https://github.com/alemar11/mangapy"
+            url "__ARCHIVE_URL__"
+            sha256 "__ARCHIVE_SHA256__"
+            license "MIT"
+
+            depends_on "libyaml"
+            depends_on "pillow"
+            depends_on "python@3.13"
+
+            def install
+              virtualenv_install_with_resources using: "python@3.13"
+            end
+
+            test do
+              assert_match version.to_s, shell_output("#{bin}/mangapy --version")
+            end
+          end
+          RUBY
+          ruby -pi -e 'gsub("__ARCHIVE_URL__", ENV.fetch("ARCHIVE_URL")); gsub("__ARCHIVE_SHA256__", ENV.fetch("ARCHIVE_SHA256"))' Formula/mangapy.rb
+          for attempt in 1 2 3 4 5 6; do
+            if brew update-python-resources --exclude-packages pillow --package-name mangapy --version "${VERSION}" Formula/mangapy.rb; then
+              exit 0
+            fi
+            echo "PyPI resources not available yet; retrying (${attempt}/6)"
+            sleep 10
+          done
+          brew update-python-resources --exclude-packages pillow --package-name mangapy --version "${VERSION}" Formula/mangapy.rb
+        env:
+          ARCHIVE_URL: ${{ steps.meta.outputs.archive_url }}
+          ARCHIVE_SHA256: ${{ steps.archive.outputs.sha256 }}
+          VERSION: ${{ steps.meta.outputs.version }}
+
+      - name: Validate Homebrew formula
+        working-directory: homebrew-tap
+        run: |
+          set -euo pipefail
+          tap_root="$(brew --repository)/Library/Taps/alemar11"
+          mkdir -p "${tap_root}"
+          rm -rf "${tap_root}/homebrew-tap"
+          ln -s "${PWD}" "${tap_root}/homebrew-tap"
+          brew audit --strict --online mangapy
+          brew uninstall --force mangapy || true
+          brew install --build-from-source mangapy
+          brew test mangapy
+
+      - name: Commit Homebrew formula
+        working-directory: homebrew-tap
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/mangapy.rb
+          if git diff --cached --quiet; then
+            echo "Homebrew formula is already up to date."
+            exit 0
+          fi
+          git commit -m "Update mangapy to ${{ steps.meta.outputs.version }}"
+          git push

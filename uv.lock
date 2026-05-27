@@ -164,6 +164,15 @@ wheels = [
 ]
 
 [[package]]
+name = "img2pdf"
+version = "0.3.6"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pillow" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/65/12/6ee1a77614df6decefd88f781cf95b73acf93f0cc9eb03bd5042d116b85d/img2pdf-0.3.6.tar.gz", hash = "sha256:8cd5509a60b75f4442b897bad3d593e25ebd314105f3034a8f17def396a4a0fb", size = 91006, upload-time = "2020-04-30T20:19:24.795Z" }
+
+[[package]]
 name = "iniconfig"
 version = "2.3.0"
 source = { registry = "https://pypi.org/simple" }
@@ -183,10 +192,11 @@ wheels = [
 
 [[package]]
 name = "mangapy"
-version = "2.1.0"
+version = "3.0.2"
 source = { editable = "." }
 dependencies = [
     { name = "bs4" },
+    { name = "img2pdf" },
     { name = "pillow" },
     { name = "pyyaml" },
     { name = "requests" },
@@ -204,6 +214,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "bs4" },
+    { name = "img2pdf", specifier = "<0.4" },
     { name = "pillow" },
     { name = "pyyaml" },
     { name = "requests" },
