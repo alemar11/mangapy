@@ -7,10 +7,10 @@ import requests
 import shutil
 import threading
 import time
+import img2pdf
 from collections.abc import Mapping
 from functools import partial
 from tqdm import tqdm
-from PIL import Image
 from urllib.parse import urlparse
 from mangapy.mangarepository import Chapter, Page
 from concurrent.futures import ThreadPoolExecutor
@@ -110,34 +110,15 @@ class ChapterArchiver(object):
         file_list = [path for path in chapter_images_path.glob('**/*') if path.is_file()]
         chapter_images_path = list(map(lambda path: str(path.absolute()), file_list))
         images_path = natural_sort(chapter_images_path)
+        if not images_path:
+            return
 
         tmp_path = pdf_path.with_name(pdf_path.name + ".tmp")
-        if _try_img2pdf(images_path, tmp_path):
-            tmp_path.replace(pdf_path)
-            return
-
-        images = []
-        for path in images_path:
-            image = Image.open(path)
-            image.load()
-            if image.mode == 'RGBA':
-                image = image.convert('RGB')
-            images.append(image)
-
-        images_count = len(images)
-        if images_count <= 0:
-            return
-        first_image = images.pop(0)
         try:
-            if images_count == 1:
-                first_image.save(tmp_path, "PDF", resolution=100.0, save_all=True)
-            else:
-                first_image.save(tmp_path, "PDF", resolution=100.0, save_all=True, append_images=images)
+            with open(tmp_path, "wb") as output:
+                output.write(img2pdf.convert(images_path, dpi=100))
             tmp_path.replace(pdf_path)
         finally:
-            first_image.close()
-            for image in images:
-                image.close()
             if tmp_path.exists():
                 try:
                     tmp_path.unlink()
@@ -210,20 +191,3 @@ def _retry_delay(attempt: int, response: requests.Response | None = None) -> flo
             return float(retry_after)
     base = min(2 ** attempt, 5)
     return base + random.uniform(0, 0.2)
-
-
-def _try_img2pdf(image_paths: list[str], tmp_path: Path) -> bool:
-    if not image_paths:
-        return False
-    try:
-        import img2pdf
-    except Exception:
-        return False
-
-    try:
-        with open(tmp_path, "wb") as output:
-            output.write(img2pdf.convert(image_paths, dpi=100))
-        return True
-    except Exception as exc:
-        logging.warning("img2pdf failed, falling back to PIL: %s", exc)
-        return False
