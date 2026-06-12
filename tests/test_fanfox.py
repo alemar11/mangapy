@@ -1,7 +1,5 @@
 import context  # noqa: F401
-import pytest
 from mangapy.fanfox import FanFoxRepository
-from context import test_proxies as proxies
 
 
 def test_fanfox_fetch_not_existing_manga():

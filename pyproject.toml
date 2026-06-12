@@ -21,11 +21,11 @@ classifiers = [
   "Intended Audience :: End Users/Desktop",
 ]
 dependencies = [
-  "beautifulsoup4>=4.14.3",
+  "beautifulsoup4>=4.15.0",
   "img2pdf>=0.6.3",
   "pyyaml>=6.0.3",
   "requests>=2.34.2",
-  "tqdm>=4.67.3",
+  "tqdm>=4.68.2",
 ]
 
 [project.scripts]
