@@ -25,7 +25,7 @@ dependencies = [
   "img2pdf>=0.6.3",
   "pyyaml>=6.0.3",
   "requests>=2.34.2",
-  "tqdm>=4.68.2",
+  "tqdm>=4.68.3",
 ]
 
 [project.scripts]
@@ -34,8 +34,8 @@ mangapy = "mangapy.cli:main"
 [dependency-groups]
 dev = [
   "flake8>=7.3.0",
-  "pylint>=4.0.5",
-  "pytest>=9.0.3",
+  "pylint>=4.0.6",
+  "pytest>=9.1.1",
   "rope>=1.14.0",
 ]
 
