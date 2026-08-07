@@ -2,20 +2,21 @@ import logging
 import os
 import random
 import re
-import sys
-import requests
 import shutil
+import sys
 import threading
 import time
-import img2pdf
 from collections.abc import Mapping
-from functools import partial
-from tqdm import tqdm
-from urllib.parse import urlparse
-from mangapy.mangarepository import Chapter, Page
 from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 from pathlib import Path
+from urllib.parse import urlparse
 
+import img2pdf
+import requests
+from tqdm import tqdm
+
+from mangapy.mangarepository import Chapter, Page
 
 tqdm.set_lock(threading.RLock())
 
@@ -39,16 +40,16 @@ class ChapterArchiver(object):
             chapter_name = chapter_id if chapter_id is not None else "unknown"
 
         if pdf:
-            pdf_path = self.path.joinpath('pdf')
+            pdf_path = self.path.joinpath("pdf")
             pdf_path.mkdir(parents=True, exist_ok=True)
-            chapter_pdf_file_path = pdf_path.joinpath(chapter_name + '.pdf')
+            chapter_pdf_file_path = pdf_path.joinpath(chapter_name + ".pdf")
             lock = self._get_pdf_lock(chapter_pdf_file_path)
             with lock:
                 if os.path.isfile(chapter_pdf_file_path):
                     print("⏺  {0} already downloaded and it will be skipped.".format(chapter_name))
                     return  # early exit if the file is already on disk
                 self._download_chapter_images(chapter, chapter_name, headers, pdf=True)
-                chapter_images_path = self.path.joinpath('.images', chapter_name)
+                chapter_images_path = self.path.joinpath(".images", chapter_name)
                 self._create_chapter_pdf(chapter_images_path, chapter_pdf_file_path)
                 shutil.rmtree(chapter_images_path, ignore_errors=True)
         else:
@@ -89,13 +90,13 @@ class ChapterArchiver(object):
     def _save_image(self, image_path: Path, headers: Mapping[str, str | bytes | None] | None, page: Page):
         file_name = str(page.number)
         image_url = page.url
-        file_ext = urlparse(image_url).path.split('.')[-1]
-        file_path = image_path.joinpath(file_name + '.' + file_ext)
+        file_ext = urlparse(image_url).path.split(".")[-1]
+        file_path = image_path.joinpath(file_name + "." + file_ext)
         if os.path.isfile(file_path):
             return  # early exit if the file is already on disk
 
-        if image_url.startswith('//'):
-            image_url = 'https:' + image_url
+        if image_url.startswith("//"):
+            image_url = "https:" + image_url
 
         data = self._fetch_image(image_url, headers=headers)
 
@@ -107,7 +108,7 @@ class ChapterArchiver(object):
             output.write(data)
 
     def _create_chapter_pdf(self, chapter_images_path: Path, pdf_path: Path):
-        file_list = [path for path in chapter_images_path.glob('**/*') if path.is_file()]
+        file_list = [path for path in chapter_images_path.glob("**/*") if path.is_file()]
         chapter_images_path = list(map(lambda path: str(path.absolute()), file_list))
         images_path = natural_sort(chapter_images_path)
         if not images_path:
@@ -150,7 +151,7 @@ class ChapterArchiver(object):
             print(f"⛔️  {chapter_name} has no pages available on this provider.")
             return
 
-        images_path = self.path.joinpath('.images' if pdf else 'images')
+        images_path = self.path.joinpath(".images" if pdf else "images")
         chapter_images_path = images_path.joinpath(chapter_name)
         chapter_images_path.mkdir(parents=True, exist_ok=True)
         pages = chapter.pages()
@@ -158,7 +159,7 @@ class ChapterArchiver(object):
             print("🆘  {0} doesn't have any pages and it will be skipped.".format(chapter_name))
             return
 
-        description = ('Chapter {0}'.format(chapter_name))
+        description = "Chapter {0}".format(chapter_name)
         func = partial(self._save_image, chapter_images_path, headers)  # currying
 
         disable_progress = (not self.show_progress) or (not sys.stderr.isatty())
@@ -167,7 +168,7 @@ class ChapterArchiver(object):
                 executor.map(func, pages),
                 total=len(pages),
                 desc=description,
-                unit='pages',
+                unit="pages",
                 ncols=100,
                 disable=disable_progress,
             ):
@@ -179,7 +180,7 @@ def natural_sort(list):
         return int(text) if text.isdigit() else text.lower()
 
     def alphanum_key(key):
-        return [convert(c) for c in re.split('([0-9]+)', key)]
+        return [convert(c) for c in re.split("([0-9]+)", key)]
 
     return sorted(list, key=alphanum_key)
 
@@ -189,5 +190,5 @@ def _retry_delay(attempt: int, response: requests.Response | None = None) -> flo
         retry_after = response.headers.get("Retry-After")
         if retry_after and retry_after.isdigit():
             return float(retry_after)
-    base = min(2 ** attempt, 5)
+    base = min(2**attempt, 5)
     return base + random.uniform(0, 0.2)

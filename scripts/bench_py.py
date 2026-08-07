@@ -6,8 +6,8 @@ import random
 import time
 from pathlib import Path
 
-from mangapy.download_manager import _parse_number
 from mangapy.chapter_archiver import ChapterArchiver
+from mangapy.download_manager import _parse_number
 from mangapy.providers import get_repository
 
 
@@ -81,7 +81,7 @@ def main():
         if not manga:
             return
         chapter = _pick_chapter(manga, args.chapter)
-        run_root = os.path.join(args.out, "bench-py", f"{int(time.time()*1000)}-{random.randint(0,99999)}")
+        run_root = os.path.join(args.out, "bench-py", f"{int(time.time() * 1000)}-{random.randint(0, 99999)}")
         os.makedirs(run_root, exist_ok=True)
         archiver = ChapterArchiver(
             run_root,
@@ -96,7 +96,7 @@ def main():
         if not manga:
             return
         chapter = _pick_chapter(manga, args.chapter)
-        run_root = os.path.join(args.out, "bench-py", f"{int(time.time()*1000)}-{random.randint(0,99999)}")
+        run_root = os.path.join(args.out, "bench-py", f"{int(time.time() * 1000)}-{random.randint(0, 99999)}")
         os.makedirs(run_root, exist_ok=True)
         archiver = ChapterArchiver(
             run_root,

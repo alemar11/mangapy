@@ -12,6 +12,25 @@ on:
   workflow_dispatch:
 
 jobs:
+  code-quality:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - uses: astral-sh/setup-uv@v8.1.0
+        with:
+          enable-cache: true
+      - name: Check lockfile
+        run: uv lock --check
+      - name: Run Ruff lint
+        run: uv run --locked ruff check .
+      - name: Check Ruff formatting
+        run: uv run --locked ruff format --check .
+
   offline-tests:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest

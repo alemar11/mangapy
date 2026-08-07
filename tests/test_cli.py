@@ -138,9 +138,7 @@ def test_parse_single_chapter_and_range():
 
 def test_extract_options():
     assert cli._extract_options({"title": "x"}) is None
-    options = cli._extract_options(
-        {"translated_language": ["it"], "content_rating": "safe", "data_saver": True}
-    )
+    options = cli._extract_options({"translated_language": ["it"], "content_rating": "safe", "data_saver": True})
     assert options == {"translated_language": ["it"], "content_rating": "safe", "data_saver": True}
 
 

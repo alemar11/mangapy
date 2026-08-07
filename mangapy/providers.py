@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import Any, Dict, Type
 
-
 _REGISTRY: Dict[str, Type[Any]] = {}
 _LOADED = False
 

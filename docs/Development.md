@@ -1,17 +1,21 @@
 ## Development
 
-## Configure VSCode
+## Configure VSCode
 
-settings.json
+Install the Ruff VS Code extension and configure it as the Python formatter and
+import organizer:
 
 ```json
 {
-    "python.linting.enabled": true,
-    "python.linting.pylintEnabled": false,
-    "python.linting.flake8Enabled": true,
-    "python.linting.flake8Args": [
-        "--max-line-length=130",
-    ],
+    "ruff.nativeServer": "on",
+    "[python]": {
+        "editor.defaultFormatter": "charliermarsh.ruff",
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+            "source.fixAll.ruff": "explicit",
+            "source.organizeImports.ruff": "explicit"
+        }
+    },
     "files.exclude": {
         "**/__pycache__": true,
         "**/*.egg-info": true,
@@ -20,6 +24,8 @@ settings.json
     }
 }
 ```
+
+The repository configuration keeps the existing 130-character line length.
 
 For users that want to set a default interpreter for a workspace, you can use the new setting `python.defaultInterpreterPath`.
 With uv, the virtual environment is typically `.venv` in the project root, so you can set:

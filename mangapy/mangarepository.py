@@ -1,4 +1,3 @@
-
 import re
 from abc import ABC, abstractmethod
 from typing import List
@@ -6,7 +5,7 @@ from typing import List
 from mangapy.capabilities import ProviderCapabilities
 
 
-class Page():
+class Page:
     def __init__(self, number: int, url: str):
         self.number = number
         self.url = url
@@ -37,7 +36,7 @@ class Manga(ABC):
     @property
     def subdirectory(self):
         # subdirectory where chapters should be saved
-        return re.sub(r'[^A-Za-z0-9]+', '_', re.sub(r'^[^A-Za-z0-9]+|[^A-Za-z0-9]+$', '', self.title)).lower()
+        return re.sub(r"[^A-Za-z0-9]+", "_", re.sub(r"^[^A-Za-z0-9]+|[^A-Za-z0-9]+$", "", self.title)).lower()
 
 
 class MangaRepository(ABC):

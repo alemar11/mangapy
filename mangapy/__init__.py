@@ -1,3 +1,3 @@
 import logging
 
-log = logging.getLogger('mangapy')
+log = logging.getLogger("mangapy")

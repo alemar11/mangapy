@@ -1,6 +1,6 @@
 from mangapy.capabilities import ProviderCapabilities
 from mangapy.download_manager import DownloadManager, DownloadRequest
-from mangapy.mangarepository import Manga, Chapter, Page
+from mangapy.mangarepository import Chapter, Manga, Page
 
 
 class DummyChapter(Chapter):

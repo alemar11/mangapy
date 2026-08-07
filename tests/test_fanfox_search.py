@@ -1,4 +1,4 @@
-from mangapy.fanfox import FanFoxRepository, FanFoxChapter
+from mangapy.fanfox import FanFoxChapter, FanFoxRepository
 
 
 class _FakeResponse:
@@ -27,10 +27,7 @@ class _FakeSession:
 def _search_html(titles: list[tuple[str, str]]) -> str:
     items = []
     for title, href in titles:
-        items.append(
-            f'<li><p class="manga-list-4-item-title">'
-            f'<a href="{href}" title="{title}">{title}</a></p></li>'
-        )
+        items.append(f'<li><p class="manga-list-4-item-title"><a href="{href}" title="{title}">{title}</a></p></li>')
     items_html = "".join(items)
     return f'<ul class="manga-list-4-list line">{items_html}</ul>'
 

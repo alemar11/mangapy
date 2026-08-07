@@ -1,9 +1,10 @@
-import requests
 import threading
 import time
 
+import requests
+
 from mangapy.capabilities import ProviderCapabilities
-from mangapy.mangarepository import MangaRepository, Manga, Chapter, Page
+from mangapy.mangarepository import Chapter, Manga, MangaRepository, Page
 
 
 class MangadexRepository(MangaRepository):
@@ -316,4 +317,4 @@ def _retry_delay(response: requests.Response | None, attempt: int) -> float:
         retry_after = response.headers.get("Retry-After")
         if retry_after and retry_after.isdigit():
             return float(retry_after)
-    return min(2 ** attempt, 5)
+    return min(2**attempt, 5)

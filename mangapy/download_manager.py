@@ -138,10 +138,7 @@ def _search_manga(repository, request: DownloadRequest) -> Manga | None:
         language_display = ", ".join(languages) if languages else "none"
         rating_display = ", ".join(ratings) if ratings else "none"
         print(f"❌  {manga.title} found, but no chapters matched the requested language(s): {language_display}.")
-        print(
-            "ℹ️  Try a different language via YAML (translated_language) or adjust content_rating: "
-            f"{rating_display}."
-        )
+        print(f"ℹ️  Try a different language via YAML (translated_language) or adjust content_rating: {rating_display}.")
         return None
 
     print(f"❌  Manga {request.title} has no chapters available.")

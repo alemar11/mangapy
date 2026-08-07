@@ -1,16 +1,17 @@
 import context  # noqa: F401
+
 from mangapy.fanfox import FanFoxRepository
 
 
 def test_fanfox_fetch_not_existing_manga():
     repository = FanFoxRepository()
-    manga = repository.search('this manga doesn\'t exists')
+    manga = repository.search("this manga doesn't exists")
     assert manga is None
 
 
 def test_fetch_manga_chapter_pages():
     repository = FanFoxRepository()
-    manga = repository.search('ahiru no sora')
+    manga = repository.search("ahiru no sora")
     assert manga is not None
     assert len(manga.chapters) >= 165, "It should contain at least 165 chapters (expected more)"
     chapter = next((chapter for chapter in manga.chapters if chapter.number == 164.0), None)
@@ -27,7 +28,7 @@ def test_fetch_manga_chapter_pages():
 
 def test_fetch_manga():
     repository = FanFoxRepository()
-    manga = repository.search('kimetsu no yaiba')
+    manga = repository.search("kimetsu no yaiba")
     assert manga is not None
     assert len(manga.chapters) >= 209, "It should contain at least 209 chapters"
     firstChapter = manga.chapters[0]
@@ -44,7 +45,7 @@ def test_fetch_manga():
 def test_fanfox_fetch_manga_with_missing_extra_chapters():
     # Chapters numbered "87.E" and "87.Extra" that gets skipped by the engine
     repository = FanFoxRepository()
-    manga = repository.search('tower of god')
+    manga = repository.search("tower of god")
     assert manga is not None
     assert len(manga.chapters) >= 600, "It should contain more than chapters"
     chapter = manga.chapters[87]
@@ -62,7 +63,7 @@ def test_fanfox_fetch_manga_with_missing_extra_chapters():
 def test_fanfox_fetch_manga_licensed():
     repository = FanFoxRepository()
     # repository.proxies = proxies
-    manga = repository.search('naruto')
+    manga = repository.search("naruto")
     assert manga is not None
     assert len(manga.chapters) == 750, "It should contain 750 chapters"
     firstChapter = manga.chapters[0]
@@ -88,7 +89,7 @@ def test_fanfox_fetch_manga_licensed():
 
 def test_fanfox_fetch_adult_content():
     repository = FanFoxRepository()
-    manga = repository.search('Backstage Lovers')
+    manga = repository.search("Backstage Lovers")
     assert manga is not None
     assert len(manga.chapters) == 4, "It should contain 4 chapters"
     firstChapter = manga.chapters[0]
