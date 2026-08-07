@@ -7,7 +7,7 @@ name = "mangapy"
 version = "4.0.0"
 description = "Manga downloader"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.14"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [{name = "Alessandro Marzoli", email = "alessandromarzoli@gmail.com"}]
@@ -15,7 +15,7 @@ urls = {Homepage = "https://github.com/alemar11/mangapy"}
 classifiers = [
   "Development Status :: 5 - Production/Stable",
   "Programming Language :: Python",
-  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.14",
   "Topic :: Games/Entertainment",
   "Topic :: Software Development :: Libraries :: Python Modules",
   "Intended Audience :: End Users/Desktop",
@@ -43,7 +43,7 @@ where = ["."]
 include = ["mangapy*"]
 
 [tool.ruff]
-target-version = "py311"
+target-version = "py314"
 line-length = 130
 
 [tool.ruff.lint]

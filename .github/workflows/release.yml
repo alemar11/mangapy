@@ -19,7 +19,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-python@v6
         with:
-          python-version: "3.13"
+          python-version: "3.14"
       - uses: astral-sh/setup-uv@v8.1.0
         with:
           enable-cache: true
@@ -103,10 +103,10 @@ jobs:
 
             depends_on "libyaml"
             depends_on "pillow"
-            depends_on "python@3.13"
+            depends_on "python@3.14"
 
             def install
-              virtualenv_install_with_resources using: "python@3.13"
+              virtualenv_install_with_resources using: "python@3.14"
             end
 
             test do
