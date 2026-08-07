@@ -80,6 +80,9 @@ jobs:
           token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
           path: homebrew-tap
 
+      - name: Trust Homebrew formula
+        run: brew trust --formula alemar11/tap/mangapy
+
       - name: Update Homebrew formula
         working-directory: homebrew-tap
         run: |
