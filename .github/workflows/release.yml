@@ -136,6 +136,7 @@ jobs:
             formula = formula.sub(/sha256 "[0-9a-f]{64}"/, %(sha256 "#{ENV.fetch("ARCHIVE_SHA256")}"))
             formula = formula.gsub("__ARCHIVE_URL__", ENV.fetch("ARCHIVE_URL"))
             formula = formula.gsub("__ARCHIVE_SHA256__", ENV.fetch("ARCHIVE_SHA256"))
+            formula = formula.gsub(/python@3[.]\d+/, "python@3.14")
             File.write(path, formula)
           RUBY
           for attempt in 1 2 3 4 5 6; do
