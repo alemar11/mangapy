@@ -61,7 +61,18 @@ jobs:
         run: uv build
 
       - name: Publish to PyPI
-        run: uv publish --trusted-publishing automatic --check-url https://pypi.org/simple/
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          set -euo pipefail
+          index_url="https://pypi.org/simple/mangapy/"
+          index="$(curl --fail --location --silent --show-error "${index_url}")"
+          if grep -Fq "mangapy-${VERSION}-py3-none-any.whl" <<< "${index}" &&
+            grep -Fq "mangapy-${VERSION}.tar.gz" <<< "${index}"; then
+            echo "mangapy ${VERSION} is already published on PyPI; skipping upload."
+          else
+            uv publish --trusted-publishing automatic --check-url https://pypi.org/simple/
+          fi
 
       - name: Compute source archive checksum
         id: archive
