@@ -6,13 +6,12 @@ import random
 import re
 import shutil
 import stat
-import sys
 import tempfile
 import threading
 import time
 import unicodedata
 from collections.abc import Mapping, Sequence
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
@@ -23,13 +22,10 @@ import img2pdf
 import pikepdf
 import requests
 from PIL import Image
-from tqdm import tqdm
 
 from mangapy import log, terminal
 from mangapy.mangarepository import Chapter, Page
 from mangapy.pathutils import sanitize_filename_component as _sanitize_filename_component
-
-tqdm.set_lock(threading.RLock())
 
 ArchiveStatus = Literal["downloaded", "already_exists", "unavailable", "failed"]
 _PageStatus = Literal["downloaded", "already_exists", "failed"]
@@ -120,6 +116,7 @@ class ChapterArchiver:
         retry_enabled: bool = True,
         show_progress: bool = True,
         proxies: Mapping[str, str] | None = None,
+        progress: terminal.DownloadProgress | None = None,
     ):
         output_path = Path(path).expanduser()
         output_path.mkdir(parents=True, exist_ok=True)
@@ -133,6 +130,7 @@ class ChapterArchiver:
         self.max_workers = max_workers
         self.retry_enabled = retry_enabled
         self.show_progress = show_progress
+        self.progress = progress if progress is not None else terminal.DownloadProgress(enabled=show_progress)
         self.proxies = dict(proxies or {})
         self._session_local = threading.local()
         self._chapter_lock_guard = threading.Lock()
@@ -471,21 +469,26 @@ class ChapterArchiver:
 
         images_directory = ".images" if pdf else "images"
         chapter_images_path = self._ensure_directory(images_directory, chapter_name)
-        description = f"Chapter {chapter_name}"
         save_page = partial(self._save_image, chapter_images_path, headers)
 
-        disable_progress = (not self.show_progress) or (not sys.stderr.isatty())
-        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            page_results = tuple(
-                tqdm(
-                    executor.map(save_page, pages),
-                    total=len(pages),
-                    desc=description,
-                    unit="pages",
-                    ncols=100,
-                    disable=disable_progress,
-                )
-            )
+        with self.progress:
+            task_id = self.progress.add_chapter(chapter_name, len(pages))
+            try:
+                ordered_results: list[_PageResult | None] = [None] * len(pages)
+                with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+                    future_indexes = {executor.submit(save_page, page): index for index, page in enumerate(pages)}
+                    for future in as_completed(future_indexes):
+                        index = future_indexes[future]
+                        try:
+                            ordered_results[index] = future.result()
+                        finally:
+                            self.progress.advance(task_id)
+            finally:
+                self.progress.remove_chapter(task_id)
+
+        if any(result is None for result in ordered_results):
+            raise RuntimeError(f"Chapter {chapter_name} did not produce a result for every page")
+        page_results = tuple(result for result in ordered_results if result is not None)
 
         result = _ImageDownloadResult(len(pages), page_results)
         if not pdf and result.complete:
