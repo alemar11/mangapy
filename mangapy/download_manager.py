@@ -93,12 +93,13 @@ class DownloadManager:
             _validate_capabilities(capabilities)
             manga_subdirectory = _select_manga_subdirectory(request.output, request.source, manga)
             directory = ensure_real_subdirectory(request.output, request.source, manga_subdirectory)
+            progress = terminal.DownloadProgress(enabled=not request.no_progress)
             archiver = ChapterArchiver(
                 str(directory),
                 max_workers=capabilities.max_parallel_pages,
                 retry_enabled=not request.no_retry,
-                show_progress=not request.no_progress,
                 proxies=request.proxy,
+                progress=progress,
             )
         except Exception as exc:
             message = f"Unable to initialize chapter downloads: {exc}"
@@ -106,16 +107,17 @@ class DownloadManager:
             return DownloadResult(selected_chapters=len(chapters), error=message)
 
         terminal.info(f"Downloading {len(chapters)} chapter(s)...", icon="↓")
-        if capabilities.max_parallel_chapters > 1 and len(chapters) > 1:
-            with ThreadPoolExecutor(max_workers=capabilities.max_parallel_chapters) as executor:
-                archive_results = list(
-                    executor.map(
-                        lambda chapter: _archive_with_archiver(archiver, chapter, request.pdf, headers),
-                        chapters,
+        with progress:
+            if capabilities.max_parallel_chapters > 1 and len(chapters) > 1:
+                with ThreadPoolExecutor(max_workers=capabilities.max_parallel_chapters) as executor:
+                    archive_results = list(
+                        executor.map(
+                            lambda chapter: _archive_with_archiver(archiver, chapter, request.pdf, headers),
+                            chapters,
+                        )
                     )
-                )
-        else:
-            archive_results = [_archive_with_archiver(archiver, chapter, request.pdf, headers) for chapter in chapters]
+            else:
+                archive_results = [_archive_with_archiver(archiver, chapter, request.pdf, headers) for chapter in chapters]
 
         result = _summarize_archive_results(archive_results)
         if result.succeeded:

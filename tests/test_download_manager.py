@@ -1,3 +1,4 @@
+from mangapy import terminal
 from mangapy.capabilities import ProviderCapabilities
 from mangapy.chapter_archiver import ArchiveResult
 from mangapy.download_manager import (
@@ -62,12 +63,29 @@ def test_download_manager_parallel_chapters(monkeypatch, tmp_path):
     repo = DummyRepo(max_parallel_chapters=2)
     calls = []
     archiver_ids = []
+    progress_instances = []
+
+    class RecordingProgress:
+        def __init__(self, enabled):
+            self.enabled = enabled
+            self.entered = 0
+            self.exited = 0
+            progress_instances.append(self)
+
+        def __enter__(self):
+            self.entered += 1
+            return self
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            self.exited += 1
 
     monkeypatch.setattr("mangapy.download_manager.get_repository", lambda name: repo)
+    monkeypatch.setattr(terminal, "DownloadProgress", RecordingProgress)
 
     def fake_archive(archiver, chapter, pdf, headers):
         calls.append(chapter.chapter_id)
         archiver_ids.append(id(archiver))
+        assert archiver.progress is progress_instances[0]
         return _downloaded(chapter)
 
     monkeypatch.setattr("mangapy.download_manager._archive_with_archiver", fake_archive)
@@ -82,6 +100,10 @@ def test_download_manager_parallel_chapters(monkeypatch, tmp_path):
 
     assert sorted(calls) == ["1", "2"]
     assert len(set(archiver_ids)) == 1
+    assert len(progress_instances) == 1
+    assert progress_instances[0].enabled
+    assert progress_instances[0].entered == 1
+    assert progress_instances[0].exited == 1
     assert result.succeeded
     assert result.downloaded_chapters == 2
 

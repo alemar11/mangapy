@@ -1,13 +1,14 @@
 from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
 from pathlib import Path
+from threading import Event
 from types import SimpleNamespace
 
 import pytest
 import requests
 from PIL import Image
 
-from mangapy.chapter_archiver import ArchiveResult, ChapterArchiver, _retry_delay
+from mangapy.chapter_archiver import ArchiveResult, ChapterArchiver, _PageResult, _retry_delay
 from mangapy.mangarepository import Page
 
 _UNSET = object()
@@ -35,6 +36,31 @@ class DummyChapter:
 
     def pages(self):
         return self._pages
+
+
+class RecordingProgress:
+    def __init__(self):
+        self.entered = 0
+        self.exited = 0
+        self.advanced = []
+        self.removed = []
+
+    def __enter__(self):
+        self.entered += 1
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.exited += 1
+
+    def add_chapter(self, chapter_name, total_pages):
+        self.chapter = (chapter_name, total_pages)
+        return 7
+
+    def advance(self, task_id):
+        self.advanced.append(task_id)
+
+    def remove_chapter(self, task_id):
+        self.removed.append(task_id)
 
 
 def test_archive_uses_normalized_chapter_dir(tmp_path, monkeypatch):
@@ -546,7 +572,8 @@ def test_incomplete_success_status_does_not_satisfy_archive_result_contract():
 
 
 def test_page_errors_are_aggregated_without_stopping_other_downloads(tmp_path, monkeypatch):
-    archiver = ChapterArchiver(str(tmp_path), max_workers=2)
+    progress = RecordingProgress()
+    archiver = ChapterArchiver(str(tmp_path), max_workers=2, progress=progress)
     calls = []
 
     def fetch_image(self, url, headers):
@@ -568,6 +595,65 @@ def test_page_errors_are_aggregated_without_stopping_other_downloads(tmp_path, m
     assert result.saved_pages == 1
     assert sorted(calls) == ["https://example.com/0.jpg", "https://example.com/1.jpg"]
     assert (tmp_path / "images" / "1" / "1.jpg").is_file()
+    assert progress.chapter == ("1", 2)
+    assert progress.advanced == [7, 7]
+    assert progress.removed == [7]
+    assert progress.entered == 1
+    assert progress.exited == 1
+
+
+def test_parallel_page_progress_preserves_provider_order(tmp_path, monkeypatch):
+    progress = RecordingProgress()
+    archiver = ChapterArchiver(str(tmp_path), max_workers=2, progress=progress)
+    second_page_completed = Event()
+    completion_order = []
+
+    def save_image(image_path, headers, page):
+        if page.number == 0:
+            assert second_page_completed.wait(timeout=2)
+        completion_order.append(page.number)
+        if page.number == 1:
+            second_page_completed.set()
+        return _PageResult("downloaded", image_path / f"{page.number}.png")
+
+    monkeypatch.setattr(archiver, "_save_image", save_image)
+    chapter = DummyChapter(
+        1.0,
+        [Page(0, "https://example.com/0.png"), Page(1, "https://example.com/1.png")],
+    )
+
+    result = archiver._download_chapter_images(
+        chapter,
+        "1",
+        headers=None,
+        pdf=True,
+        known_pages_count=2,
+    )
+
+    assert completion_order == [1, 0]
+    assert [path.name for path in result.image_paths] == ["0.png", "1.png"]
+    assert progress.advanced == [7, 7]
+    assert progress.removed == [7]
+
+
+def test_unexpected_page_worker_exception_tears_down_progress(tmp_path, monkeypatch):
+    progress = RecordingProgress()
+    archiver = ChapterArchiver(str(tmp_path), max_workers=1, progress=progress)
+
+    def fail_to_save(image_path, headers, page):
+        raise RuntimeError("worker failed")
+
+    monkeypatch.setattr(archiver, "_save_image", fail_to_save)
+    chapter = DummyChapter(1.0, [Page(0, "https://example.com/0.png")])
+
+    result = archiver.archive(chapter, pdf=False, headers=None)
+
+    assert result.status == "failed"
+    assert "worker failed" in result.message
+    assert progress.advanced == [7]
+    assert progress.removed == [7]
+    assert progress.entered == 1
+    assert progress.exited == 1
 
 
 def test_duplicate_page_targets_fail_before_downloading(tmp_path, monkeypatch):
