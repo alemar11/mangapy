@@ -10,8 +10,9 @@ import tempfile
 import threading
 import time
 import unicodedata
-from collections.abc import Mapping, Sequence
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from collections.abc import Iterator, Mapping, Sequence
+from concurrent.futures import ThreadPoolExecutor, as_completed, wait
+from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
@@ -104,6 +105,44 @@ class _ImageDownloadResult:
         return self.expected_pages > 0 and self.saved_pages == self.expected_pages
 
 
+class _PageWorkerBatch:
+    def __init__(self, max_workers: int):
+        self.max_workers = max_workers
+        self.executor_local = threading.local()
+        self.session_local = threading.local()
+        self._lock = threading.Lock()
+        self._executors: list[ThreadPoolExecutor] = []
+        self._sessions: list[requests.Session] = []
+
+    def executor_for_current_thread(self) -> ThreadPoolExecutor:
+        executor = getattr(self.executor_local, "executor", None)
+        if executor is None:
+            executor = ThreadPoolExecutor(max_workers=self.max_workers)
+            self.executor_local.executor = executor
+            with self._lock:
+                self._executors.append(executor)
+        return executor
+
+    def register_session(self, session: requests.Session) -> None:
+        with self._lock:
+            self._sessions.append(session)
+
+    def close(self) -> None:
+        with self._lock:
+            executors = tuple(self._executors)
+            sessions = tuple(self._sessions)
+            self._executors.clear()
+            self._sessions.clear()
+
+        for executor in executors:
+            executor.shutdown(wait=True)
+        for session in sessions:
+            try:
+                session.close()
+            except Exception as exc:
+                log.warning("Could not close an image download session: %s", exc)
+
+
 class UnsafeOutputPathError(OSError):
     pass
 
@@ -133,8 +172,24 @@ class ChapterArchiver:
         self.progress = progress if progress is not None else terminal.DownloadProgress(enabled=show_progress)
         self.proxies = dict(proxies or {})
         self._session_local = threading.local()
+        self._page_worker_batch_lock = threading.Lock()
+        self._page_worker_batch: _PageWorkerBatch | None = None
         self._chapter_lock_guard = threading.Lock()
         self._chapter_locks: dict[str, threading.Lock] = {}
+
+    @contextmanager
+    def reuse_page_workers(self) -> Iterator[ChapterArchiver]:
+        batch = _PageWorkerBatch(self.max_workers)
+        with self._page_worker_batch_lock:
+            if self._page_worker_batch is not None:
+                raise RuntimeError("Page worker reuse is already active")
+            self._page_worker_batch = batch
+        try:
+            yield self
+        finally:
+            with self._page_worker_batch_lock:
+                self._page_worker_batch = None
+            batch.close()
 
     def archive(
         self,
@@ -422,12 +477,20 @@ class ChapterArchiver:
                 log.warning("Could not discard invalid cached image %s: %s", image_path, exc)
 
     def _get_session(self) -> requests.Session:
-        session = getattr(self._session_local, "session", None)
+        batch = self._active_page_worker_batch()
+        session_local = batch.session_local if batch is not None else self._session_local
+        session = getattr(session_local, "session", None)
         if session is None:
             session = requests.Session()
             session.proxies.update(self.proxies)
-            self._session_local.session = session
+            session_local.session = session
+            if batch is not None:
+                batch.register_session(session)
         return session
+
+    def _active_page_worker_batch(self) -> _PageWorkerBatch | None:
+        with self._page_worker_batch_lock:
+            return self._page_worker_batch
 
     def _get_chapter_lock(self, chapter_name: str) -> threading.Lock:
         with self._chapter_lock_guard:
@@ -475,14 +538,59 @@ class ChapterArchiver:
             task_id = self.progress.add_chapter(chapter_name, len(pages))
             try:
                 ordered_results: list[_PageResult | None] = [None] * len(pages)
-                with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-                    future_indexes = {executor.submit(save_page, page): index for index, page in enumerate(pages)}
-                    for future in as_completed(future_indexes):
-                        index = future_indexes[future]
+
+                def collect_results(executor: ThreadPoolExecutor) -> None:
+                    future_indexes = {}
+                    try:
+                        for index, page in enumerate(pages):
+                            future_indexes[executor.submit(save_page, page)] = index
+                    except BaseException:
+                        for future in future_indexes:
+                            future.cancel()
+                        wait(future_indexes)
+                        raise
+
+                    first_error: BaseException | None = None
+                    try:
+                        for future in as_completed(future_indexes):
+                            index = future_indexes[future]
+                            try:
+                                ordered_results[index] = future.result()
+                            except BaseException as exc:
+                                if first_error is None:
+                                    first_error = exc
+                            try:
+                                self.progress.advance(task_id)
+                            except BaseException as exc:
+                                if first_error is None:
+                                    first_error = exc
+                    finally:
+                        wait(future_indexes)
+                    if first_error is not None:
+                        raise first_error
+
+                batch = self._active_page_worker_batch()
+                if self.max_workers == 1 and batch is not None:
+                    first_error: BaseException | None = None
+                    for index, page in enumerate(pages):
                         try:
-                            ordered_results[index] = future.result()
-                        finally:
+                            ordered_results[index] = save_page(page)
+                        except BaseException as exc:
+                            if first_error is None:
+                                first_error = exc
+                        try:
                             self.progress.advance(task_id)
+                        except BaseException as exc:
+                            if first_error is None:
+                                first_error = exc
+                    if first_error is not None:
+                        raise first_error
+                else:
+                    if batch is not None:
+                        collect_results(batch.executor_for_current_thread())
+                    else:
+                        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+                            collect_results(executor)
             finally:
                 self.progress.remove_chapter(task_id)
 
@@ -501,12 +609,14 @@ class ChapterArchiver:
         return result
 
     def _remove_stale_images(self, image_path: Path, expected_paths: Sequence[Path]) -> str:
+        expected_by_name = {_filesystem_name_key(path.name): path for path in expected_paths}
         try:
             for candidate in image_path.iterdir():
                 metadata = candidate.lstat()
                 if not stat.S_ISREG(metadata.st_mode) or not _is_managed_page_file(candidate.name):
                     continue
-                if any(_same_file(candidate, expected_path) for expected_path in expected_paths):
+                expected_path = expected_by_name.get(_filesystem_name_key(candidate.name))
+                if expected_path is not None and _same_file(candidate, expected_path):
                     continue
                 self._safe_file_target(image_path, candidate.name)
                 candidate.unlink()
