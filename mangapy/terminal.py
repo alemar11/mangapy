@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import logging
+import threading
 from collections.abc import Iterable
 from typing import Literal
 
 from rich.console import Console
 from rich.logging import RichHandler
+from rich.progress import BarColumn, MofNCompleteColumn, Progress, SpinnerColumn, TaskID, TextColumn, TimeRemainingColumn
 from rich.table import Table
 from rich.text import Text
 from rich.theme import Theme
@@ -32,6 +34,93 @@ _DEFAULT_ICONS: dict[MessageKind, str] = {
 stdout = Console(theme=_THEME, markup=False, highlight=False)
 stderr = Console(theme=_THEME, markup=False, highlight=False, stderr=True)
 _managed_logging_handler: RichHandler | None = None
+
+
+class _ProgressDisplay:
+    def __init__(self, console: Console):
+        self.console = console
+        self.progress = Progress(
+            SpinnerColumn(style="mangapy.info"),
+            TextColumn("{task.description}", style="mangapy.info", markup=False),
+            BarColumn(),
+            MofNCompleteColumn(),
+            TextColumn("pages", markup=False),
+            TimeRemainingColumn(compact=True),
+            console=console,
+            transient=True,
+            redirect_stdout=False,
+            redirect_stderr=False,
+        )
+        self._lifecycle_lock = threading.Lock()
+        self._context_depth = 0
+
+    def acquire(self) -> None:
+        with self._lifecycle_lock:
+            if self._context_depth == 0:
+                self.progress.start()
+            self._context_depth += 1
+
+    def release(self) -> None:
+        with self._lifecycle_lock:
+            self._context_depth -= 1
+            if self._context_depth == 0:
+                self.progress.stop()
+
+
+_shared_progress_lock = threading.Lock()
+_shared_progress_display: _ProgressDisplay | None = None
+
+
+def _get_shared_progress_display() -> _ProgressDisplay:
+    global _shared_progress_display
+    with _shared_progress_lock:
+        if _shared_progress_display is None:
+            _shared_progress_display = _ProgressDisplay(stderr)
+        return _shared_progress_display
+
+
+class DownloadProgress:
+    def __init__(self, enabled: bool = True, *, console: Console | None = None):
+        self._requested_enabled = enabled
+        self._display = _ProgressDisplay(console) if console is not None else _get_shared_progress_display()
+        self._progress = self._display.progress
+        self._context_local = threading.local()
+
+    @property
+    def enabled(self) -> bool:
+        states = getattr(self._context_local, "states", ())
+        if states:
+            return states[-1]
+        return self._requested_enabled and self._display.console.is_terminal
+
+    def __enter__(self) -> DownloadProgress:
+        active = self._requested_enabled and self._display.console.is_terminal
+        if active:
+            self._display.acquire()
+        states = getattr(self._context_local, "states", None)
+        if states is None:
+            states = []
+            self._context_local.states = states
+        states.append(active)
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        active = self._context_local.states.pop()
+        if active:
+            self._display.release()
+
+    def add_chapter(self, chapter_name: str, total_pages: int) -> TaskID | None:
+        if not self.enabled:
+            return None
+        return self._progress.add_task(f"Chapter {chapter_name}", total=total_pages)
+
+    def advance(self, task_id: TaskID | None) -> None:
+        if task_id is not None:
+            self._progress.advance(task_id)
+
+    def remove_chapter(self, task_id: TaskID | None) -> None:
+        if task_id is not None:
+            self._progress.remove_task(task_id)
 
 
 def info(message: object, *, icon: str | None = None) -> None:
