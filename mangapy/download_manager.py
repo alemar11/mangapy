@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
+from mangapy import terminal
 from mangapy.chapter_archiver import ArchiveResult, ChapterArchiver
 from mangapy.mangarepository import Chapter, Manga
 from mangapy.pathutils import ensure_real_subdirectory
@@ -60,13 +61,13 @@ class DownloadManager:
         _configure_logging(request.enable_debug_log)
         validation_error = _validate_request(request)
         if validation_error:
-            log.error("❌  %s", validation_error)
+            log.error("%s", validation_error)
             return DownloadResult(error=validation_error)
 
         try:
             repository = get_repository(request.source)
         except ValueError as exc:
-            log.error("❌  %s", exc)
+            log.error("%s", exc)
             return DownloadResult(error=str(exc))
         if request.proxy:
             repository.proxies = request.proxy
@@ -74,17 +75,17 @@ class DownloadManager:
             repository.no_retry = request.no_retry
 
         log.debug("download request source=%s title=%r options=%r", request.source, request.title, request.options)
-        print(f"🔎  Searching for {request.title} in {request.source}...")
+        terminal.info(f"Searching for {request.title} in {request.source}...", icon="⌕")
         manga = _search_manga(repository, request)
         if manga is None:
             return DownloadResult(error=f"Unable to find a downloadable manga for {request.title}")
 
-        print(f"✅  {manga.title} found")
+        terminal.success(f"Found {manga.title}.")
 
         chapters = _select_chapters(manga, request)
         if not chapters:
             message = "Chapter selection is empty"
-            log.error("❌  %s.", message)
+            log.error("%s.", message)
             return DownloadResult(error=message)
         try:
             headers = repository.image_request_headers()
@@ -104,7 +105,7 @@ class DownloadManager:
             _log_failure("%s", message)
             return DownloadResult(selected_chapters=len(chapters), error=message)
 
-        print("⬇️  Download started.")
+        terminal.info(f"Downloading {len(chapters)} chapter(s)...", icon="↓")
         if capabilities.max_parallel_chapters > 1 and len(chapters) > 1:
             with ThreadPoolExecutor(max_workers=capabilities.max_parallel_chapters) as executor:
                 archive_results = list(
@@ -118,12 +119,12 @@ class DownloadManager:
 
         result = _summarize_archive_results(archive_results)
         if result.succeeded:
-            print("🎉  Download finished.")
+            terminal.success(
+                f"Download finished: {result.downloaded_chapters} downloaded, {result.existing_chapters} already present."
+            )
         else:
-            log.error(
-                "Download completed with errors: %d failed, %d unavailable.",
-                result.failed_chapters,
-                result.unavailable_chapters,
+            terminal.error(
+                f"Download completed with errors: {result.failed_chapters} failed, {result.unavailable_chapters} unavailable."
             )
         return result
 
@@ -177,7 +178,7 @@ def _search_manga(repository, request: DownloadRequest) -> Manga | None:
         return None
 
     if manga is None:
-        print(f"❌  Manga {request.title} doesn't exist.")
+        terminal.error(f"Manga {request.title} doesn't exist.", to_stderr=False)
         _print_suggestions(repository, request.title, request.options)
         return None
 
@@ -190,11 +191,14 @@ def _search_manga(repository, request: DownloadRequest) -> Manga | None:
         ratings = _normalize_option_list(options.get("content_rating"), ["safe", "suggestive", "erotica"])
         language_display = ", ".join(languages) if languages else "none"
         rating_display = ", ".join(ratings) if ratings else "none"
-        print(f"❌  {manga.title} found, but no chapters matched the requested language(s): {language_display}.")
-        print(f"ℹ️  Try a different language via YAML (translated_language) or adjust content_rating: {rating_display}.")
+        terminal.error(
+            f"{manga.title} found, but no chapters matched the requested language(s): {language_display}.",
+            to_stderr=False,
+        )
+        terminal.info(f"Try a different language via YAML (translated_language) or adjust content_rating: {rating_display}.")
         return None
 
-    print(f"❌  Manga {request.title} has no chapters available.")
+    terminal.error(f"Manga {request.title} has no chapters available.", to_stderr=False)
     return None
 
 
@@ -206,9 +210,7 @@ def _print_suggestions(repository, title: str, options: dict | None) -> None:
         return
     if not suggestions:
         return
-    print("💡  Did you mean one of these?")
-    for suggestion in suggestions:
-        print(f"   - {suggestion}")
+    terminal.suggestions(suggestions)
 
 
 def _select_chapters(manga: Manga, request: DownloadRequest) -> list[Chapter]:
@@ -221,7 +223,7 @@ def _select_chapters(manga: Manga, request: DownloadRequest) -> list[Chapter]:
         )
     )
     if selector_count > 1:
-        log.error("❌  Chapter selection fields are mutually exclusive.")
+        log.error("Chapter selection fields are mutually exclusive.")
         return []
 
     if request.download_all_chapters:
@@ -235,7 +237,7 @@ def _select_chapters(manga: Manga, request: DownloadRequest) -> list[Chapter]:
                 return [chapter]
             if chapter.chapter_id == value:
                 return [chapter]
-        log.error("❌  Chapter doesn't exist.")
+        log.error("Chapter doesn't exist.")
         return []
 
     if request.download_chapters is not None:
@@ -245,7 +247,7 @@ def _select_chapters(manga: Manga, request: DownloadRequest) -> list[Chapter]:
             log.error(str(exc))
             return []
         if begin is None:
-            log.error("❌  Invalid chapter range.")
+            log.error("Invalid chapter range.")
             return []
         selected: list[Chapter] = []
         for chapter in manga.chapters:
@@ -265,7 +267,7 @@ def _select_chapters(manga: Manga, request: DownloadRequest) -> list[Chapter]:
 def _select_last_downloadable_chapter(manga: Manga) -> list[Chapter]:
     chapter = manga.last_downloadable_chapter
     if chapter is None:
-        log.error("❌  No downloadable chapter is available.")
+        log.error("No downloadable chapter is available.")
         return []
     return [chapter]
 
@@ -290,10 +292,7 @@ def _parse_number(value: object) -> float | None:
 
 
 def _configure_logging(debug: bool) -> None:
-    level = logging.DEBUG if debug else logging.ERROR
-    if not logging.getLogger().handlers:
-        logging.basicConfig(level=level, format="%(levelname)s: %(message)s")
-    log.setLevel(level)
+    terminal.configure_logging(debug)
 
 
 def _validate_request(request: DownloadRequest) -> str | None:
