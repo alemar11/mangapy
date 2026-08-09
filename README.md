@@ -23,6 +23,8 @@ brew install alemar11/tap/mangapy
 
 Mangapy lets you download manga chapters as images (default) or PDFs.
 Use `mangapy -h` to get a list of all the available options.
+Terminal messages are styled automatically when output is interactive and stay
+plain when redirected or run in CI. Set `NO_COLOR=1` to disable terminal colors.
 
 Downloads all Bleach chapters as images inside the *Downloads* folder (from FanFox).
 

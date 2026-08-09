@@ -9,6 +9,7 @@ from urllib.parse import urlparse
 
 import yaml
 
+from mangapy import terminal
 from mangapy.download_manager import DownloadManager, DownloadRequest
 from mangapy.providers import available_providers
 
@@ -67,7 +68,7 @@ def cmd_parse():
         "-v", "--version", action="version", version="{0} {1}".format(parser.prog, version), help="show program version and exit"
     )
 
-    args = parser.parse_args()
+    args = parser.parse_args(sys.argv[1:])
     return args
 
 
@@ -78,7 +79,7 @@ def main() -> int:
             return main_title(args)
         return main_yaml(args)
     except KeyboardInterrupt:
-        print("\n⛔️  Download canceled by user.")
+        terminal.warning("Download canceled by user.", icon="■", to_stderr=False)
         return 130
 
 
@@ -89,11 +90,11 @@ def main_yaml(args: argparse.Namespace) -> int:
         with open(yaml_file, encoding="utf-8") as file:
             dictionary = yaml.safe_load(file)
     except (OSError, yaml.YAMLError) as error:
-        print(f"Unable to read YAML configuration: {error}", file=sys.stderr)
+        terminal.error(f"Unable to read YAML configuration: {error}")
         return 1
 
     if not isinstance(dictionary, Mapping):
-        print("YAML configuration must contain a mapping at the document root.", file=sys.stderr)
+        terminal.error("YAML configuration must contain a mapping at the document root.")
         return 1
 
     try:
@@ -104,11 +105,11 @@ def main_yaml(args: argparse.Namespace) -> int:
         no_progress = _bool_value(dictionary, "no_progress", False)
         downloads = _normalize_yaml_downloads(dictionary)
     except ValueError as error:
-        print(f"Invalid YAML configuration: {error}", file=sys.stderr)
+        terminal.error(f"Invalid YAML configuration: {error}")
         return 1
 
     if not downloads:
-        print("YAML configuration does not contain any downloads.", file=sys.stderr)
+        terminal.error("YAML configuration does not contain any downloads.")
         return 1
 
     manager = DownloadManager()
@@ -124,14 +125,14 @@ def main_yaml(args: argparse.Namespace) -> int:
                 default_no_progress=no_progress,
             )
         except ValueError as error:
-            print(f"Invalid download entry {index}: {error}", file=sys.stderr)
+            terminal.error(f"Invalid download entry {index}: {error}")
             failures += 1
             continue
 
         try:
             result = manager.download(request)
         except Exception as error:
-            print(f"Download entry {index} failed unexpectedly: {error}", file=sys.stderr)
+            terminal.error(f"Download entry {index} failed unexpectedly: {error}")
             failures += 1
             continue
         if not result.succeeded:
@@ -143,21 +144,21 @@ def main_yaml(args: argparse.Namespace) -> int:
 def main_title(args: argparse.Namespace) -> int:
     source = _normalize_source(args.source) if args.source else "fanfox"
     if source not in available_providers():
-        print(f"Unknown manga source: {source}", file=sys.stderr)
+        terminal.error(f"Unknown manga source: {source}")
         return 1
     try:
         title = _text_value(args.manga_title, "manga title")
         output = _text_value(args.out, "output")
     except ValueError as error:
-        print(error, file=sys.stderr)
+        terminal.error(error)
         return 1
     proxy = None
     if args.proxy is not None:
         if _is_valid_proxy(args.proxy):
-            print("Setting proxy")
+            terminal.info("Using configured proxy.", icon="↗")
             proxy = dict(args.proxy)
         else:
-            print("The proxy must define valid http:// or https:// URLs for both http and https.", file=sys.stderr)
+            terminal.error("The proxy must define valid http:// or https:// URLs for both http and https.")
             return 1
 
     request = DownloadRequest(
@@ -177,7 +178,7 @@ def main_title(args: argparse.Namespace) -> int:
     try:
         result = DownloadManager().download(request)
     except Exception as error:
-        print(f"Download failed unexpectedly: {error}", file=sys.stderr)
+        terminal.error(f"Download failed unexpectedly: {error}")
         return 1
     return 0 if result.succeeded else 1
 

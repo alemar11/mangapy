@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import math
 import os
 import random
@@ -26,6 +25,7 @@ import requests
 from PIL import Image
 from tqdm import tqdm
 
+from mangapy import log, terminal
 from mangapy.mangarepository import Chapter, Page
 from mangapy.pathutils import sanitize_filename_component as _sanitize_filename_component
 
@@ -153,7 +153,7 @@ class ChapterArchiver:
                 return self._archive_locked(chapter, chapter_name, expected_pages, pdf, headers)
         except Exception as exc:
             message = f"Failed to archive chapter {chapter_name}: {exc}"
-            logging.error(message)
+            log.error(message)
             return ArchiveResult("failed", chapter_name, expected_pages, 0, message)
 
     def _archive_locked(
@@ -178,7 +178,7 @@ class ChapterArchiver:
                     fetched_pages = chapter.pages()
                     if fetched_pages is None:
                         message = f"Could not verify the existing PDF for chapter {chapter_name}: page discovery failed."
-                        logging.error(message)
+                        log.error(message)
                         return ArchiveResult(
                             "failed",
                             chapter_name,
@@ -190,7 +190,7 @@ class ChapterArchiver:
                     existing_pdf_is_complete = len(fetched_pages) == existing_pdf_pages and len(fetched_pages) > 0
             if existing_pdf_is_complete:
                 message = f"Chapter {chapter_name} is already downloaded and will be skipped."
-                print(f"⏺  {message}")
+                terminal.muted(message)
                 return ArchiveResult(
                     "already_exists",
                     chapter_name,
@@ -202,12 +202,12 @@ class ChapterArchiver:
         external_url = getattr(chapter, "external_url", None)
         if external_url:
             message = f"Chapter {chapter_name} is hosted externally and has no pages on this provider: {external_url}"
-            print(f"⛔️  {message}")
+            terminal.warning(message, to_stderr=False)
             return ArchiveResult("unavailable", chapter_name, known_pages_count, 0, message)
 
         if getattr(chapter, "pages_count", None) == 0:
             message = f"Chapter {chapter_name} has no pages available on this provider."
-            print(f"⛔️  {message}")
+            terminal.warning(message, to_stderr=False)
             return ArchiveResult("unavailable", chapter_name, 0, 0, message)
 
         image_result = self._download_chapter_images(
@@ -219,7 +219,7 @@ class ChapterArchiver:
             pages=preloaded_pages,
         )
         if image_result.unavailable_message:
-            print(f"🆘  {image_result.unavailable_message}")
+            terminal.warning(image_result.unavailable_message, to_stderr=False)
             return ArchiveResult(
                 "unavailable",
                 chapter_name,
@@ -229,7 +229,7 @@ class ChapterArchiver:
             )
 
         if image_result.failure_message:
-            logging.error(image_result.failure_message)
+            log.error(image_result.failure_message)
             return ArchiveResult(
                 "failed",
                 chapter_name,
@@ -245,7 +245,7 @@ class ChapterArchiver:
             message = (
                 f"Chapter {chapter_name} is incomplete: {failed_pages} of {image_result.expected_pages} pages failed{details}."
             )
-            logging.error(message)
+            log.error(message)
             return ArchiveResult(
                 "failed",
                 chapter_name,
@@ -260,7 +260,7 @@ class ChapterArchiver:
                 self._create_chapter_pdf(image_result.image_paths, pdf_file_path)
             except Exception as exc:
                 message = f"Failed to create PDF for chapter {chapter_name}: {exc}"
-                logging.error(message)
+                log.error(message)
                 return ArchiveResult(
                     "failed",
                     chapter_name,
@@ -273,7 +273,7 @@ class ChapterArchiver:
             try:
                 shutil.rmtree(chapter_images_path)
             except OSError as exc:
-                logging.warning("Could not remove temporary images for chapter %s: %s", chapter_name, exc)
+                log.warning("Could not remove temporary images for chapter %s: %s", chapter_name, exc)
 
             message = f"Downloaded chapter {chapter_name} as PDF."
             return ArchiveResult(
@@ -328,7 +328,7 @@ class ChapterArchiver:
                 time.sleep(_retry_delay(attempt, response))
 
         if last_error:
-            logging.error("Failed to download image %s: %s", url, last_error)
+            log.error("Failed to download image %s: %s", url, last_error)
         return None
 
     def _save_image(
@@ -351,7 +351,7 @@ class ChapterArchiver:
             data = self._fetch_image(image_url, headers=headers)
             if not data:
                 message = f"Can't download page {file_name}"
-                logging.error(message)
+                log.error(message)
                 return _PageResult("failed", None, message)
 
             with tempfile.NamedTemporaryFile(
@@ -373,7 +373,7 @@ class ChapterArchiver:
             return _PageResult("downloaded", file_path)
         except Exception as exc:
             message = f"Can't save page {file_name}: {exc}"
-            logging.error(message)
+            log.error(message)
             return _PageResult("failed", None, message)
         finally:
             if temporary_path is not None:
@@ -421,7 +421,7 @@ class ChapterArchiver:
                 self._safe_file_target(image_path.parent, image_path.name)
                 image_path.unlink(missing_ok=True)
             except OSError as exc:
-                logging.warning("Could not discard invalid cached image %s: %s", image_path, exc)
+                log.warning("Could not discard invalid cached image %s: %s", image_path, exc)
 
     def _get_session(self) -> requests.Session:
         session = getattr(self._session_local, "session", None)
@@ -659,4 +659,4 @@ def _unlink_if_exists(path: Path) -> None:
     except FileNotFoundError:
         pass
     except OSError:
-        logging.warning("Could not remove temporary file %s", path)
+        log.warning("Could not remove temporary file %s", path)
