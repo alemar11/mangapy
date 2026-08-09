@@ -152,7 +152,7 @@ jobs:
             File.write(path, formula)
           RUBY
           for attempt in 1 2 3 4 5 6; do
-            if brew update-python-resources --exclude-packages pillow --package-name mangapy --version "${VERSION}" "${formula_path}"; then
+            if brew update-python-resources --ignore-main-package-cooldown --exclude-packages pillow --package-name mangapy --version "${VERSION}" "${formula_path}"; then
               exit 0
             fi
             echo "PyPI resources not available yet; retrying (${attempt}/6)"

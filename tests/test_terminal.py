@@ -58,6 +58,43 @@ def test_configure_logging_installs_one_rich_stderr_handler(capsys):
             handler.close()
 
 
+def test_configure_logging_disables_debug_again_for_loggers_using_managed_root(capsys):
+    root_logger = logging.getLogger()
+    mangapy_logger = logging.getLogger("mangapy")
+    third_party_logger = logging.getLogger("third_party_test")
+    original_handlers = list(root_logger.handlers)
+    original_root_level = root_logger.level
+    original_mangapy_level = mangapy_logger.level
+    original_third_party_level = third_party_logger.level
+    original_third_party_propagate = third_party_logger.propagate
+    installed_handlers = []
+
+    try:
+        root_logger.handlers = []
+        third_party_logger.setLevel(logging.NOTSET)
+        third_party_logger.propagate = True
+
+        terminal.configure_logging(debug=True)
+        third_party_logger.debug("Visible third-party debug")
+        assert "Visible third-party debug" in capsys.readouterr().err
+
+        terminal.configure_logging(debug=False)
+        assert root_logger.level == logging.ERROR
+        assert mangapy_logger.level == logging.ERROR
+
+        third_party_logger.debug("Hidden third-party debug")
+        assert "Hidden third-party debug" not in capsys.readouterr().err
+        installed_handlers = list(root_logger.handlers)
+    finally:
+        root_logger.handlers = original_handlers
+        root_logger.setLevel(original_root_level)
+        mangapy_logger.setLevel(original_mangapy_level)
+        third_party_logger.setLevel(original_third_party_level)
+        third_party_logger.propagate = original_third_party_propagate
+        for handler in installed_handlers:
+            handler.close()
+
+
 def test_configure_logging_preserves_an_existing_root_handler():
     root_logger = logging.getLogger()
     mangapy_logger = logging.getLogger("mangapy")
@@ -68,9 +105,16 @@ def test_configure_logging_preserves_an_existing_root_handler():
 
     try:
         root_logger.handlers = [existing_handler]
+        root_logger.setLevel(logging.WARNING)
+        terminal.configure_logging(debug=True)
+
+        assert root_logger.handlers == [existing_handler]
+        assert root_logger.level == logging.WARNING
+
         terminal.configure_logging(debug=False)
 
         assert root_logger.handlers == [existing_handler]
+        assert root_logger.level == logging.WARNING
     finally:
         root_logger.handlers = original_handlers
         root_logger.setLevel(original_root_level)
