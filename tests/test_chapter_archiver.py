@@ -1,7 +1,8 @@
+import os
 from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
 from pathlib import Path
-from threading import Event
+from threading import Barrier, Event, Lock, current_thread, get_ident
 from types import SimpleNamespace
 
 import pytest
@@ -512,6 +513,199 @@ def test_configured_proxies_are_applied_to_every_thread_local_session(tmp_path):
     assert session_proxies == [proxies, proxies]
 
 
+def test_page_worker_batch_reuses_and_closes_thread_local_sessions(tmp_path, monkeypatch):
+    archiver = ChapterArchiver(str(tmp_path), max_workers=2, retry_enabled=False, show_progress=False)
+    sessions = []
+    session_uses = {"1": set(), "2": set()}
+    barriers = {"1": Barrier(2), "2": Barrier(2)}
+    usage_lock = Lock()
+    worker_threads = set()
+
+    class FakeSession:
+        def __init__(self):
+            self.proxies = {}
+            self.owner = get_ident()
+            self.close_calls = 0
+            sessions.append(self)
+
+        def close(self):
+            self.close_calls += 1
+
+    def fetch_image(self, url, headers):
+        chapter_name = url.split("/")[-2]
+        session = self._get_session()
+        assert session.owner == get_ident()
+        with usage_lock:
+            session_uses[chapter_name].add(id(session))
+            worker_threads.add(current_thread())
+        barriers[chapter_name].wait(timeout=2)
+        return _png_bytes()
+
+    monkeypatch.setattr("mangapy.chapter_archiver.requests.Session", FakeSession)
+    monkeypatch.setattr(ChapterArchiver, "_fetch_image", fetch_image)
+
+    with archiver.reuse_page_workers():
+        for chapter_number in (1, 2):
+            chapter = DummyChapter(
+                float(chapter_number),
+                [
+                    Page(0, f"https://example.com/{chapter_number}/0.png"),
+                    Page(1, f"https://example.com/{chapter_number}/1.png"),
+                ],
+            )
+            assert archiver.archive(chapter, pdf=False, headers=None).succeeded
+        assert len(sessions) == 2
+        assert session_uses["1"] == session_uses["2"]
+
+    assert all(session.close_calls == 1 for session in sessions)
+    assert all(not thread.is_alive() for thread in worker_threads)
+
+
+def test_page_worker_batch_preserves_parallelism_per_chapter(tmp_path, monkeypatch):
+    archiver = ChapterArchiver(str(tmp_path), max_workers=2, show_progress=False)
+    all_workers_started = Barrier(4)
+    counter_lock = Lock()
+    active_by_chapter = {"1": 0, "2": 0}
+    peak_by_chapter = {"1": 0, "2": 0}
+    global_active = 0
+    global_peak = 0
+
+    def save_image(image_path, headers, page):
+        nonlocal global_active, global_peak
+        chapter_name = image_path.name
+        with counter_lock:
+            active_by_chapter[chapter_name] += 1
+            peak_by_chapter[chapter_name] = max(
+                peak_by_chapter[chapter_name],
+                active_by_chapter[chapter_name],
+            )
+            global_active += 1
+            global_peak = max(global_peak, global_active)
+        try:
+            all_workers_started.wait(timeout=2)
+            return _PageResult("downloaded", image_path / f"{page.number}.png")
+        finally:
+            with counter_lock:
+                active_by_chapter[chapter_name] -= 1
+                global_active -= 1
+
+    monkeypatch.setattr(archiver, "_save_image", save_image)
+
+    def download(chapter_number):
+        chapter = DummyChapter(
+            float(chapter_number),
+            [
+                Page(0, f"https://example.com/{chapter_number}/0.png"),
+                Page(1, f"https://example.com/{chapter_number}/1.png"),
+            ],
+        )
+        return archiver._download_chapter_images(
+            chapter,
+            str(chapter_number),
+            headers=None,
+            pdf=True,
+            known_pages_count=2,
+        )
+
+    with archiver.reuse_page_workers(), ThreadPoolExecutor(max_workers=2) as executor:
+        results = list(executor.map(download, (1, 2)))
+
+    assert all(result.complete for result in results)
+    assert peak_by_chapter == {"1": 2, "2": 2}
+    assert global_peak == 4
+
+
+def test_single_page_worker_does_not_create_an_executor(tmp_path, monkeypatch):
+    archiver = ChapterArchiver(str(tmp_path), max_workers=1, show_progress=False)
+    caller_thread = get_ident()
+    fetch_threads = []
+
+    def fail_executor(*args, **kwargs):
+        raise AssertionError("single-worker downloads should run inline")
+
+    def fetch_image(self, url, headers):
+        fetch_threads.append(get_ident())
+        return _png_bytes()
+
+    monkeypatch.setattr("mangapy.chapter_archiver.ThreadPoolExecutor", fail_executor)
+    monkeypatch.setattr(ChapterArchiver, "_fetch_image", fetch_image)
+    chapter = DummyChapter(1.0, [Page(0, "https://example.com/0.png")])
+
+    with archiver.reuse_page_workers():
+        result = archiver.archive(chapter, pdf=False, headers=None)
+
+    assert result.succeeded
+    assert fetch_threads == [caller_thread]
+
+
+def test_single_page_worker_outside_batch_keeps_ephemeral_behavior(tmp_path, monkeypatch):
+    archiver = ChapterArchiver(str(tmp_path), max_workers=1, show_progress=False)
+    caller_thread = get_ident()
+    fetch_threads = []
+
+    def fetch_image(self, url, headers):
+        self._get_session()
+        fetch_threads.append(get_ident())
+        return _png_bytes()
+
+    monkeypatch.setattr(ChapterArchiver, "_fetch_image", fetch_image)
+    chapter = DummyChapter(1.0, [Page(0, "https://example.com/0.png")])
+
+    result = archiver.archive(chapter, pdf=False, headers=None)
+
+    assert result.succeeded
+    assert fetch_threads[0] != caller_thread
+    assert not hasattr(archiver._session_local, "session")
+
+
+def test_page_worker_batch_drains_futures_after_partial_submit_failure(tmp_path, monkeypatch):
+    archiver = ChapterArchiver(str(tmp_path), max_workers=2, show_progress=False)
+    worker_started = Event()
+    release_worker = Event()
+    worker_completed = Event()
+    executors = []
+
+    class PartialSubmitExecutor:
+        def __init__(self, max_workers):
+            self.executor = ThreadPoolExecutor(max_workers=max_workers)
+            self.submit_calls = 0
+            self.shutdown_called = False
+            executors.append(self)
+
+        def submit(self, fn, *args, **kwargs):
+            self.submit_calls += 1
+            if self.submit_calls == 2:
+                assert worker_started.wait(timeout=2)
+                release_worker.set()
+                raise RuntimeError("submit failed")
+            return self.executor.submit(fn, *args, **kwargs)
+
+        def shutdown(self, wait=True):
+            self.shutdown_called = True
+            self.executor.shutdown(wait=wait)
+
+    def save_image(image_path, headers, page):
+        worker_started.set()
+        assert release_worker.wait(timeout=2)
+        worker_completed.set()
+        return _PageResult("downloaded", image_path / f"{page.number}.png")
+
+    monkeypatch.setattr("mangapy.chapter_archiver.ThreadPoolExecutor", PartialSubmitExecutor)
+    monkeypatch.setattr(archiver, "_save_image", save_image)
+    chapter = DummyChapter(
+        1.0,
+        [Page(0, "https://example.com/0.png"), Page(1, "https://example.com/1.png")],
+    )
+
+    with archiver.reuse_page_workers():
+        result = archiver.archive(chapter, pdf=False, headers=None)
+        assert result.status == "failed"
+        assert worker_completed.is_set()
+
+    assert len(executors) == 1
+    assert executors[0].shutdown_called
+
+
 @pytest.mark.parametrize(
     ("chapter", "expected_message"),
     [
@@ -698,6 +892,44 @@ def test_successful_image_run_removes_files_not_in_the_current_feed(tmp_path, mo
     assert not (chapter_path / "1.png").exists()
     assert (chapter_path / "notes.txt").is_file()
     assert (chapter_path / "cover.png").is_file()
+
+
+def test_stale_cleanup_only_checks_matching_filesystem_names(tmp_path, monkeypatch):
+    archiver = ChapterArchiver(str(tmp_path), max_workers=1)
+    chapter_path = archiver._ensure_directory("images", "1")
+    expected_paths = []
+    for page_number in range(100):
+        page_path = chapter_path / f"{page_number}.jpg"
+        page_path.touch()
+        expected_paths.append(page_path)
+    for page_number in range(100, 110):
+        (chapter_path / f"{page_number}.jpg").touch()
+
+    comparisons = []
+
+    def same_file(first, second):
+        comparisons.append((first, second))
+        return first == second
+
+    monkeypatch.setattr("mangapy.chapter_archiver._same_file", same_file)
+
+    assert archiver._remove_stale_images(chapter_path, expected_paths) == ""
+    assert len(comparisons) == len(expected_paths)
+    assert {path.name for path in chapter_path.iterdir()} == {path.name for path in expected_paths}
+
+
+def test_stale_cleanup_removes_managed_hardlink_alias(tmp_path):
+    archiver = ChapterArchiver(str(tmp_path), max_workers=1)
+    chapter_path = archiver._ensure_directory("images", "1")
+    expected_path = chapter_path / "0.jpg"
+    stale_alias = chapter_path / "1.jpg"
+    expected_path.touch()
+    os.link(expected_path, stale_alias)
+
+    assert expected_path.samefile(stale_alias)
+    assert archiver._remove_stale_images(chapter_path, [expected_path]) == ""
+    assert expected_path.is_file()
+    assert not stale_alias.exists()
 
 
 def test_fetch_image_does_not_sleep_after_last_retry(tmp_path, monkeypatch):

@@ -1,6 +1,8 @@
+from contextlib import contextmanager
+
 from mangapy import terminal
 from mangapy.capabilities import ProviderCapabilities
-from mangapy.chapter_archiver import ArchiveResult
+from mangapy.chapter_archiver import ArchiveResult, ChapterArchiver
 from mangapy.download_manager import (
     DownloadManager,
     DownloadRequest,
@@ -64,6 +66,7 @@ def test_download_manager_parallel_chapters(monkeypatch, tmp_path):
     calls = []
     archiver_ids = []
     progress_instances = []
+    worker_batch_lifecycle = []
 
     class RecordingProgress:
         def __init__(self, enabled):
@@ -81,6 +84,18 @@ def test_download_manager_parallel_chapters(monkeypatch, tmp_path):
 
     monkeypatch.setattr("mangapy.download_manager.get_repository", lambda name: repo)
     monkeypatch.setattr(terminal, "DownloadProgress", RecordingProgress)
+    original_reuse_page_workers = ChapterArchiver.reuse_page_workers
+
+    @contextmanager
+    def recording_reuse_page_workers(self):
+        worker_batch_lifecycle.append("entered")
+        try:
+            with original_reuse_page_workers(self):
+                yield self
+        finally:
+            worker_batch_lifecycle.append("exited")
+
+    monkeypatch.setattr(ChapterArchiver, "reuse_page_workers", recording_reuse_page_workers)
 
     def fake_archive(archiver, chapter, pdf, headers):
         calls.append(chapter.chapter_id)
@@ -104,6 +119,7 @@ def test_download_manager_parallel_chapters(monkeypatch, tmp_path):
     assert progress_instances[0].enabled
     assert progress_instances[0].entered == 1
     assert progress_instances[0].exited == 1
+    assert worker_batch_lifecycle == ["entered", "exited"]
     assert result.succeeded
     assert result.downloaded_chapters == 2
 

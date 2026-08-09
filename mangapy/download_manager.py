@@ -107,7 +107,7 @@ class DownloadManager:
             return DownloadResult(selected_chapters=len(chapters), error=message)
 
         terminal.info(f"Downloading {len(chapters)} chapter(s)...", icon="↓")
-        with progress:
+        with progress, archiver.reuse_page_workers():
             if capabilities.max_parallel_chapters > 1 and len(chapters) > 1:
                 with ThreadPoolExecutor(max_workers=capabilities.max_parallel_chapters) as executor:
                     archive_results = list(
