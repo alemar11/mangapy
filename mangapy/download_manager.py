@@ -1,13 +1,20 @@
 from __future__ import annotations
 
 import logging
-import os
+import math
+import re
+import stat
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from typing import Iterable, List
+from pathlib import Path
+from typing import Iterable
 
-from mangapy.chapter_archiver import ChapterArchiver
+from mangapy.chapter_archiver import ArchiveResult, ChapterArchiver
 from mangapy.mangarepository import Chapter, Manga
+from mangapy.pathutils import ensure_real_subdirectory
 from mangapy.providers import get_repository
+
+log = logging.getLogger("mangapy")
 
 
 @dataclass
@@ -27,100 +34,146 @@ class DownloadRequest:
     options: dict | None = None
 
 
-class DownloadManager:
-    def download(self, request: DownloadRequest) -> None:
-        if request.enable_debug_log:
-            logging.getLogger("mangapy").setLevel(logging.DEBUG)
-        else:
-            logging.getLogger("mangapy").setLevel(logging.ERROR)
+@dataclass(frozen=True)
+class DownloadResult:
+    selected_chapters: int = 0
+    downloaded_chapters: int = 0
+    existing_chapters: int = 0
+    unavailable_chapters: int = 0
+    failed_chapters: int = 0
+    error: str | None = None
 
-        repository = get_repository(request.source)
+    @property
+    def succeeded(self) -> bool:
+        completed = self.downloaded_chapters + self.existing_chapters
+        return (
+            self.error is None
+            and self.selected_chapters > 0
+            and completed == self.selected_chapters
+            and self.failed_chapters == 0
+            and self.unavailable_chapters == 0
+        )
+
+
+class DownloadManager:
+    def download(self, request: DownloadRequest) -> DownloadResult:
+        _configure_logging(request.enable_debug_log)
+        validation_error = _validate_request(request)
+        if validation_error:
+            log.error("❌  %s", validation_error)
+            return DownloadResult(error=validation_error)
+
+        try:
+            repository = get_repository(request.source)
+        except ValueError as exc:
+            log.error("❌  %s", exc)
+            return DownloadResult(error=str(exc))
         if request.proxy:
             repository.proxies = request.proxy
         if hasattr(repository, "no_retry"):
             repository.no_retry = request.no_retry
 
+        log.debug("download request source=%s title=%r options=%r", request.source, request.title, request.options)
         print(f"🔎  Searching for {request.title} in {request.source}...")
         manga = _search_manga(repository, request)
         if manga is None:
-            return
+            return DownloadResult(error=f"Unable to find a downloadable manga for {request.title}")
 
         print(f"✅  {manga.title} found")
 
         chapters = _select_chapters(manga, request)
         if not chapters:
-            logging.error("❌  Chapter selection is empty.")
-            return
-        if _all_chapters_external_or_empty(chapters):
-            print("⛔️  Title found, but all selected chapters are external links or have no hosted pages.")
-            return
-
-        directory = os.path.join(request.output, request.source, manga.subdirectory)
-        headers = repository.image_request_headers()
-        max_parallel_pages = repository.capabilities.max_parallel_pages
+            message = "Chapter selection is empty"
+            log.error("❌  %s.", message)
+            return DownloadResult(error=message)
+        try:
+            headers = repository.image_request_headers()
+            capabilities = repository.capabilities
+            _validate_capabilities(capabilities)
+            manga_subdirectory = _select_manga_subdirectory(request.output, request.source, manga)
+            directory = ensure_real_subdirectory(request.output, request.source, manga_subdirectory)
+            archiver = ChapterArchiver(
+                str(directory),
+                max_workers=capabilities.max_parallel_pages,
+                retry_enabled=not request.no_retry,
+                show_progress=not request.no_progress,
+                proxies=request.proxy,
+            )
+        except Exception as exc:
+            message = f"Unable to initialize chapter downloads: {exc}"
+            _log_failure("%s", message)
+            return DownloadResult(selected_chapters=len(chapters), error=message)
 
         print("⬇️  Download started.")
-        if repository.capabilities.max_parallel_chapters > 1 and len(chapters) > 1:
-            from concurrent.futures import ThreadPoolExecutor
-
-            with ThreadPoolExecutor(max_workers=repository.capabilities.max_parallel_chapters) as executor:
-                list(
+        if capabilities.max_parallel_chapters > 1 and len(chapters) > 1:
+            with ThreadPoolExecutor(max_workers=capabilities.max_parallel_chapters) as executor:
+                archive_results = list(
                     executor.map(
-                        lambda ch: _archive_chapter(
-                            directory,
-                            max_parallel_pages,
-                            ch,
-                            request.pdf,
-                            headers,
-                            retry_enabled=not request.no_retry,
-                            show_progress=not request.no_progress,
-                        ),
+                        lambda chapter: _archive_with_archiver(archiver, chapter, request.pdf, headers),
                         chapters,
                     )
                 )
         else:
-            archiver = ChapterArchiver(
-                directory,
-                max_workers=max_parallel_pages,
-                retry_enabled=not request.no_retry,
-                show_progress=not request.no_progress,
+            archive_results = [_archive_with_archiver(archiver, chapter, request.pdf, headers) for chapter in chapters]
+
+        result = _summarize_archive_results(archive_results)
+        if result.succeeded:
+            print("🎉  Download finished.")
+        else:
+            log.error(
+                "Download completed with errors: %d failed, %d unavailable.",
+                result.failed_chapters,
+                result.unavailable_chapters,
             )
-            for chapter in chapters:
-                _archive_with_archiver(archiver, chapter, request.pdf, headers)
-
-        print("🎉  Download finished.")
+        return result
 
 
-def _archive_chapter(
-    directory: str,
-    max_parallel_pages: int,
-    chapter: Chapter,
-    pdf: bool,
-    headers,
-    retry_enabled: bool,
-    show_progress: bool,
-):
-    archiver = ChapterArchiver(
-        directory,
-        max_workers=max_parallel_pages,
-        retry_enabled=retry_enabled,
-        show_progress=show_progress,
-    )
-    _archive_with_archiver(archiver, chapter, pdf, headers)
-
-
-def _archive_with_archiver(archiver: ChapterArchiver, chapter: Chapter, pdf: bool, headers):
+def _archive_with_archiver(archiver: ChapterArchiver, chapter: Chapter, pdf: bool, headers) -> ArchiveResult:
     try:
-        archiver.archive(chapter, pdf, headers)
+        return archiver.archive(chapter, pdf, headers)
     except Exception as exc:
-        logging.error(str(exc))
+        chapter_name = str(getattr(chapter, "output_name", None) or getattr(chapter, "chapter_id", "unknown"))
+        _log_failure("Failed to archive chapter %s: %s", chapter_name, exc)
+        return ArchiveResult(
+            chapter_name=chapter_name,
+            status="failed",
+            expected_pages=0,
+            saved_pages=0,
+            message=str(exc),
+        )
+
+
+def _summarize_archive_results(results: Iterable[ArchiveResult]) -> DownloadResult:
+    results = list(results)
+    counts = {
+        "downloaded": 0,
+        "already_exists": 0,
+        "unavailable": 0,
+        "failed": 0,
+    }
+    for result in results:
+        if result.status in {"downloaded", "already_exists"} and not result.succeeded:
+            log.error("Incomplete successful archive result for chapter %s", result.chapter_name)
+            counts["failed"] += 1
+        elif result.status in counts:
+            counts[result.status] += 1
+        else:
+            log.error("Unknown archive result status %r for chapter %s", result.status, result.chapter_name)
+            counts["failed"] += 1
+    return DownloadResult(
+        selected_chapters=len(results),
+        downloaded_chapters=counts["downloaded"],
+        existing_chapters=counts["already_exists"],
+        unavailable_chapters=counts["unavailable"],
+        failed_chapters=counts["failed"],
+    )
 
 
 def _search_manga(repository, request: DownloadRequest) -> Manga | None:
     try:
         manga = repository.search(request.title, options=request.options)
     except Exception as exc:
-        logging.error(str(exc))
+        _log_failure("Provider search failed: %s", exc)
         return None
 
     if manga is None:
@@ -146,7 +199,11 @@ def _search_manga(repository, request: DownloadRequest) -> Manga | None:
 
 
 def _print_suggestions(repository, title: str, options: dict | None) -> None:
-    suggestions = repository.suggestions(title, options=options)
+    try:
+        suggestions = repository.suggestions(title, options=options)
+    except Exception as exc:
+        log.debug("Unable to load suggestions for %r: %s", title, exc)
+        return
     if not suggestions:
         return
     print("💡  Did you mean one of these?")
@@ -154,7 +211,19 @@ def _print_suggestions(repository, title: str, options: dict | None) -> None:
         print(f"   - {suggestion}")
 
 
-def _select_chapters(manga: Manga, request: DownloadRequest) -> List[Chapter]:
+def _select_chapters(manga: Manga, request: DownloadRequest) -> list[Chapter]:
+    selector_count = sum(
+        (
+            bool(request.download_all_chapters),
+            bool(request.download_last_chapter),
+            request.download_single_chapter is not None,
+            request.download_chapters is not None,
+        )
+    )
+    if selector_count > 1:
+        log.error("❌  Chapter selection fields are mutually exclusive.")
+        return []
+
     if request.download_all_chapters:
         return list(manga.chapters)
 
@@ -166,30 +235,39 @@ def _select_chapters(manga: Manga, request: DownloadRequest) -> List[Chapter]:
                 return [chapter]
             if chapter.chapter_id == value:
                 return [chapter]
-        logging.error("❌  Chapter doesn't exist.")
+        log.error("❌  Chapter doesn't exist.")
         return []
 
     if request.download_chapters is not None:
         try:
             begin, end = _parse_range(request.download_chapters)
         except ValueError as exc:
-            logging.error(str(exc))
+            log.error(str(exc))
             return []
         if begin is None:
-            logging.error("❌  Invalid chapter range.")
+            log.error("❌  Invalid chapter range.")
             return []
-        selected: List[Chapter] = []
+        selected: list[Chapter] = []
         for chapter in manga.chapters:
-            if chapter.number is None:
+            chapter_number = _parse_number(chapter.number)
+            if chapter_number is None:
                 continue
-            if chapter.number < begin:
+            if chapter_number < begin:
                 continue
-            if end is not None and chapter.number > end:
+            if end is not None and chapter_number > end:
                 continue
             selected.append(chapter)
         return selected
 
-    return [manga.last_chapter]
+    return _select_last_downloadable_chapter(manga)
+
+
+def _select_last_downloadable_chapter(manga: Manga) -> list[Chapter]:
+    chapter = manga.last_downloadable_chapter
+    if chapter is None:
+        log.error("❌  No downloadable chapter is available.")
+        return []
+    return [chapter]
 
 
 def _parse_range(value: str) -> tuple[float | None, float | None]:
@@ -203,11 +281,50 @@ def _parse_range(value: str) -> tuple[float | None, float | None]:
     return begin, end
 
 
-def _parse_number(value: str) -> float | None:
+def _parse_number(value: object) -> float | None:
     try:
-        return float(value.strip())
-    except ValueError:
+        number = float(str(value).strip())
+    except TypeError, ValueError:
         return None
+    return number if math.isfinite(number) else None
+
+
+def _configure_logging(debug: bool) -> None:
+    level = logging.DEBUG if debug else logging.ERROR
+    if not logging.getLogger().handlers:
+        logging.basicConfig(level=level, format="%(levelname)s: %(message)s")
+    log.setLevel(level)
+
+
+def _validate_request(request: DownloadRequest) -> str | None:
+    for name, value in (("title", request.title), ("source", request.source), ("output", request.output)):
+        if not isinstance(value, str) or not value.strip():
+            return f"{name} must be a non-empty string"
+    selector_count = sum(
+        (
+            bool(request.download_all_chapters),
+            bool(request.download_last_chapter),
+            request.download_single_chapter is not None,
+            request.download_chapters is not None,
+        )
+    )
+    if selector_count > 1:
+        return "Chapter selection fields are mutually exclusive"
+    return None
+
+
+def _validate_capabilities(capabilities) -> None:
+    for name in ("max_parallel_chapters", "max_parallel_pages"):
+        value = getattr(capabilities, name, None)
+        if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+            raise ValueError(f"Provider capability {name} must be a positive integer")
+
+
+def _log_failure(message: str, *args) -> None:
+    if log.isEnabledFor(logging.DEBUG):
+        log.exception(message, *args)
+    else:
+        log.error(message, *args)
 
 
 def _normalize_option_list(value, default: list[str]) -> list[str]:
@@ -218,13 +335,28 @@ def _normalize_option_list(value, default: list[str]) -> list[str]:
     return [str(value)]
 
 
-def _all_chapters_external_or_empty(chapters: Iterable[Chapter]) -> bool:
-    for chapter in chapters:
-        external_url = getattr(chapter, "external_url", None)
-        if external_url:
-            continue
-        pages_count = getattr(chapter, "pages_count", None)
-        if pages_count == 0:
-            continue
-        return False
-    return True
+def _select_manga_subdirectory(output: str, source: str, manga: Manga) -> str:
+    preferred = manga.subdirectory
+    legacy = re.sub(
+        r"[^A-Za-z0-9]+",
+        "_",
+        re.sub(r"^[^A-Za-z0-9]+|[^A-Za-z0-9]+$", "", str(manga.title)),
+    ).lower()
+    if not legacy or legacy == preferred:
+        return preferred
+
+    try:
+        output_root = Path(output).expanduser().resolve(strict=True)
+        legacy_path = output_root / source / legacy
+        preferred_path = output_root / source / preferred
+        metadata = legacy_path.lstat()
+        if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISDIR(metadata.st_mode):
+            return preferred
+        resolved_legacy = legacy_path.resolve(strict=True)
+        if resolved_legacy != output_root and output_root not in resolved_legacy.parents:
+            return preferred
+        if not preferred_path.exists():
+            return legacy
+    except OSError:
+        pass
+    return preferred

@@ -21,28 +21,28 @@ brew install alemar11/tap/mangapy
 
 ### Terminal
 
-Mangapy let you download manga chapters as images (default) or pdfs.
-Use 'mangapy -h' to get a list of all the availabe options.
+Mangapy lets you download manga chapters as images (default) or PDFs.
+Use `mangapy -h` to get a list of all the available options.
 
-Downloads all Bleach chatpers as images inside the *Downloads* folder (from Fanfox source).  
+Downloads all Bleach chapters as images inside the *Downloads* folder (from FanFox).
 
 ```
 mangapy title bleach -a -o ~/Downloads
 ```
 
-Downloads all Bleach chatpers as a single **.pdf** file inside the *Downloads* folder (from Fanfox source).  
+Downloads all Bleach chapters as one PDF per chapter inside the *Downloads* folder (from FanFox).
 
 ```
 mangapy title bleach -a -o ~/Downloads --pdf
 ```
 
-Downloads Bleach chatper 1 as images inside the *Downloads* folder (from Fanfox source).  
+Downloads Bleach chapter 1 as images inside the *Downloads* folder (from FanFox).
 
 ```
 mangapy title bleach -c 1 -o ~/Downloads
 ```
 
-Downloads Bleach chatpers from 0 to 10 (included) as images inside the *Downloads* folder using Fanfox as source.  
+Downloads Bleach chapters from 0 to 10 (included) as images inside the *Downloads* folder using FanFox as source.
 
 ```
 mangapy title bleach -c 0-10 -o ~/Downloads -s fanfox
@@ -60,21 +60,39 @@ Disable progress output.
 mangapy title bleach -c 1 -o ~/Downloads --no-progress
 ```
 
-You may need a proxy to download certain manga, to do so use the option *-p or --proxy*:
-Downloads the last One Piece chapter as images inside the *Downloads* folder (from Fanfox source) using the proxy during the search.  
+Some providers may require a proxy. Pass a JSON mapping with both `http` and
+`https` entries using `-p` or `--proxy`; every proxy URL must include its
+scheme. The mapping is used both for provider search/API requests and for
+chapter image downloads.
 
 ```
-mangapy title "one piece" -o ~/Downloads -p '{"http": "194.226.34.132:8888", "https": "194.226.34.132:8888"}'
+mangapy title "one piece" -o ~/Downloads -p '{"http": "http://194.226.34.132:8888", "https": "http://194.226.34.132:8888"}'
 ```
+
+### Exit codes
+
+- `0`: every requested download completed successfully.
+- `1`: an operational, configuration, provider-search, or partial-download error occurred.
+- `2`: command-line usage or input was rejected by the argument parser.
+- `130`: the process was interrupted by the user.
 
 ### YAML
 
-Mangapy let you download multiple manga chapters as images (default) or pdfs from a *.yaml* file.
+Mangapy lets you download multiple manga chapters as images (default) or PDFs from a *.yaml* file.
 For every manga you can choose:
+
 - source (*fanfox*, *mangadex*)
-- whether or not save the manga as a single pdf
+- whether to save each selected chapter as its own PDF
 - which chapter to download (single, range, all, last)
 - MangaDex-only options: `translated_language`, `content_rating`, `data_saver`
+
+MangaDex output names use the immutable chapter UUID so corrections to chapter
+numbers, labels, or languages do not create duplicate downloads and different
+translations or scanlations cannot overwrite each other.
+Legacy MangaDex outputs that contain only the chapter number are left untouched
+and are not reused because they do not identify their translation. In image
+mode, each `images/<chapter>` directory is managed by Mangapy and stale regular
+files are removed after a complete run.
 
 ```
 mangapy yaml PATH_TO_YOUR_YAML_FILE

@@ -6,21 +6,21 @@ import random
 import time
 from pathlib import Path
 
-from mangapy.chapter_archiver import ChapterArchiver
+from mangapy.chapter_archiver import ChapterArchiver, _known_pages_count
 from mangapy.download_manager import _parse_number
 from mangapy.providers import get_repository
 
 
 def _pick_chapter(manga, chapter_value):
     if not chapter_value:
-        return manga.last_chapter
+        return manga.last_downloadable_chapter or manga.last_chapter
     number = _parse_number(chapter_value)
     for chapter in manga.chapters:
         if number is not None and chapter.number == number:
             return chapter
         if chapter.chapter_id == chapter_value:
             return chapter
-    return manga.last_chapter
+    return manga.last_downloadable_chapter or manga.last_chapter
 
 
 def _bench_task(name, rounds, fn):
@@ -104,21 +104,23 @@ def main():
             retry_enabled=not args.no_retry,
             show_progress=not args.no_progress,
         )
-        chapter_id = getattr(chapter, "chapter_id", None)
-        if chapter.number is not None:
-            is_int = isinstance(chapter.number, int) or float(chapter.number).is_integer()
-            chapter_name = str(int(chapter.number)) if is_int else str(chapter.number)
-        else:
-            chapter_name = chapter_id if chapter_id is not None else "unknown"
+        chapter_name = archiver._chapter_name(chapter)
         # Download images once (not timed)
-        archiver._download_chapter_images(chapter, chapter_name, repo.image_request_headers(), pdf=True)
+        archiver._download_chapter_images(
+            chapter,
+            chapter_name,
+            repo.image_request_headers(),
+            pdf=True,
+            known_pages_count=_known_pages_count(chapter),
+        )
         images_path = Path(run_root).joinpath(".images", chapter_name)
 
         def _create_pdf(round_idx):
             pdf_dir = Path(run_root).joinpath("pdf")
             pdf_dir.mkdir(parents=True, exist_ok=True)
             pdf_path = pdf_dir.joinpath(f"{chapter_name}-only-{round_idx + 1}.pdf")
-            archiver._create_chapter_pdf(images_path, pdf_path)
+            image_files = [path for path in images_path.iterdir() if path.is_file()]
+            archiver._create_chapter_pdf(image_files, pdf_path)
 
         return _create_pdf
 

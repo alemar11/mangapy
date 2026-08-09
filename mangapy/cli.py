@@ -3,11 +3,14 @@ import importlib.metadata
 import json
 import os
 import sys
+from collections.abc import Mapping
 from pathlib import Path
+from urllib.parse import urlparse
 
 import yaml
 
 from mangapy.download_manager import DownloadManager, DownloadRequest
+from mangapy.providers import available_providers
 
 try:
     version = importlib.metadata.version("mangapy")
@@ -15,12 +18,32 @@ except importlib.metadata.PackageNotFoundError:
     version = "0.0.0"
 default_path_to_download_folder = str(os.path.join(Path.home(), "Downloads", "mangapy"))
 
+_GLOBAL_YAML_KEYS = {"debug", "downloads", "no_progress", "no_retry", "output", "proxy"}
+_DOWNLOAD_YAML_KEYS = {
+    "content_rating",
+    "data_saver",
+    "debug",
+    "download_all_chapters",
+    "download_chapters",
+    "download_last_chapter",
+    "download_single_chapter",
+    "no_progress",
+    "no_retry",
+    "output",
+    "pdf",
+    "proxy",
+    "source",
+    "title",
+    "translated_language",
+}
+_MANGADEX_OPTION_KEYS = {"content_rating", "data_saver", "translated_language"}
+
 
 def cmd_parse():
     """Returns parsed arguments from command line"""
     parser = argparse.ArgumentParser()
 
-    subparsers = parser.add_subparsers(help="Download modes.", dest="mode")
+    subparsers = parser.add_subparsers(help="Download modes.", dest="mode", required=True)
 
     yaml_parser = subparsers.add_parser("yaml")
     args_parser = subparsers.add_parser("title")
@@ -28,7 +51,7 @@ def cmd_parse():
     yaml_parser.add_argument("yaml_file", type=str, help="Path to the .yaml file")
 
     args_parser.add_argument("manga_title", type=str, help="manga title to download")
-    args_parser.add_argument("-s", "--source", type=str, help="manga source")
+    args_parser.add_argument("-s", "--source", type=str.lower, choices=available_providers(), help="manga source")
     args_parser.add_argument("-o", "--out", type=str, default=default_path_to_download_folder, help="download directory")
     args_parser.add_argument("-d", "--debug", action="store_true", help="set log to DEBUG level")
     args_parser.add_argument("--pdf", action="store_true", help="create a pdf for each chapter")
@@ -48,79 +71,100 @@ def cmd_parse():
     return args
 
 
-def main():
+def main() -> int:
     try:
         args = cmd_parse()
         if args.mode == "title":
-            main_title(args)
-        elif args.mode == "yaml":
-            main_yaml(args)
+            return main_title(args)
+        return main_yaml(args)
     except KeyboardInterrupt:
         print("\n⛔️  Download canceled by user.")
-        sys.exit(130)
+        return 130
 
 
-def main_yaml(args: argparse.Namespace):
+def main_yaml(args: argparse.Namespace) -> int:
     yaml_file = args.yaml_file.strip()
 
     try:
-        with open(yaml_file, "r") as f:
-            dictionary = yaml.load(f, Loader=yaml.FullLoader)
-            output = dictionary.get("output", default_path_to_download_folder)
+        with open(yaml_file, encoding="utf-8") as file:
+            dictionary = yaml.safe_load(file)
+    except (OSError, yaml.YAMLError) as error:
+        print(f"Unable to read YAML configuration: {error}", file=sys.stderr)
+        return 1
 
-            proxy = None
-            if "proxy" in dictionary.keys() and dictionary["proxy"]:
-                proxy_info = dictionary["proxy"]
-                if _is_valid_proxy(proxy_info):
-                    print("Setting proxy")
-                    proxy = dictionary["proxy"]
-                else:
-                    print("The proxy is not in the right format and it will not be used.")
+    if not isinstance(dictionary, Mapping):
+        print("YAML configuration must contain a mapping at the document root.", file=sys.stderr)
+        return 1
 
-            debug_log = bool(dictionary.get("debug", False))
-            no_retry = bool(dictionary.get("no_retry", False))
-            no_progress = bool(dictionary.get("no_progress", False))
-            downloads = _normalize_yaml_downloads(dictionary)
-            manager = DownloadManager()
-            for entry in downloads:
-                title = entry.get("title")
-                if not title:
-                    continue
-                request = DownloadRequest(
-                    title=title.strip(),
-                    source=_normalize_source(entry.get("source", "fanfox")),
-                    output=str(entry.get("output", output)).strip(),
-                    pdf=bool(entry.get("pdf", False)),
-                    proxy=entry.get("proxy", proxy),
-                    no_retry=bool(entry.get("no_retry", no_retry)),
-                    no_progress=bool(entry.get("no_progress", no_progress)),
-                    enable_debug_log=bool(entry.get("debug", debug_log)),
-                    download_all_chapters=bool(entry.get("download_all_chapters", False)),
-                    download_last_chapter=bool(entry.get("download_last_chapter", False)),
-                    download_single_chapter=entry.get("download_single_chapter"),
-                    download_chapters=entry.get("download_chapters"),
-                    options=_extract_options(entry),
-                )
-                manager.download(request)
-    except Exception as error:
-        print(error)
+    try:
+        output = _text_value(dictionary.get("output", default_path_to_download_folder), "output")
+        proxy = _proxy_value(dictionary.get("proxy"), "proxy")
+        debug_log = _bool_value(dictionary, "debug", False)
+        no_retry = _bool_value(dictionary, "no_retry", False)
+        no_progress = _bool_value(dictionary, "no_progress", False)
+        downloads = _normalize_yaml_downloads(dictionary)
+    except ValueError as error:
+        print(f"Invalid YAML configuration: {error}", file=sys.stderr)
+        return 1
+
+    if not downloads:
+        print("YAML configuration does not contain any downloads.", file=sys.stderr)
+        return 1
+
+    manager = DownloadManager()
+    failures = 0
+    for index, entry in enumerate(downloads, start=1):
+        try:
+            request = _download_request_from_yaml(
+                entry,
+                default_output=output,
+                default_proxy=proxy,
+                default_debug=debug_log,
+                default_no_retry=no_retry,
+                default_no_progress=no_progress,
+            )
+        except ValueError as error:
+            print(f"Invalid download entry {index}: {error}", file=sys.stderr)
+            failures += 1
+            continue
+
+        try:
+            result = manager.download(request)
+        except Exception as error:
+            print(f"Download entry {index} failed unexpectedly: {error}", file=sys.stderr)
+            failures += 1
+            continue
+        if not result.succeeded:
+            failures += 1
+
+    return 0 if failures == 0 else 1
 
 
-def main_title(args: argparse.Namespace):
+def main_title(args: argparse.Namespace) -> int:
     source = _normalize_source(args.source) if args.source else "fanfox"
+    if source not in available_providers():
+        print(f"Unknown manga source: {source}", file=sys.stderr)
+        return 1
+    try:
+        title = _text_value(args.manga_title, "manga title")
+        output = _text_value(args.out, "output")
+    except ValueError as error:
+        print(error, file=sys.stderr)
+        return 1
     proxy = None
-    if args.proxy:
+    if args.proxy is not None:
         if _is_valid_proxy(args.proxy):
             print("Setting proxy")
-            proxy = args.proxy
+            proxy = dict(args.proxy)
         else:
-            print("The proxy is not in the right format and it will not be used.")
+            print("The proxy must define valid http:// or https:// URLs for both http and https.", file=sys.stderr)
+            return 1
 
     request = DownloadRequest(
-        title=args.manga_title.strip(),
+        title=title,
         source=source,
-        output=args.out.strip(),
-        pdf=args.pdf or False,
+        output=output,
+        pdf=bool(args.pdf),
         proxy=proxy,
         no_retry=bool(getattr(args, "no_retry", False)),
         no_progress=bool(getattr(args, "no_progress", False)),
@@ -130,7 +174,12 @@ def main_title(args: argparse.Namespace):
         download_chapters=_parse_chapter_range(args.chapter),
         options=None,
     )
-    DownloadManager().download(request)
+    try:
+        result = DownloadManager().download(request)
+    except Exception as error:
+        print(f"Download failed unexpectedly: {error}", file=sys.stderr)
+        return 1
+    return 0 if result.succeeded else 1
 
 
 def _parse_chapter_range(value: str | None) -> str | None:
@@ -151,37 +200,177 @@ def _parse_single_chapter(value: str | None) -> str | None:
     return value.strip()
 
 
-def _is_valid_proxy(proxy_info: dict) -> bool:
-    return "http" in proxy_info.keys() and "https" in proxy_info.keys()
+def _is_valid_proxy(proxy_info: object) -> bool:
+    if not isinstance(proxy_info, Mapping):
+        return False
+    for scheme in ("http", "https"):
+        value = proxy_info.get(scheme)
+        if not isinstance(value, str):
+            return False
+        try:
+            parsed = urlparse(value)
+            hostname = parsed.hostname
+            parsed.port
+        except ValueError:
+            return False
+        if (
+            parsed.scheme not in {"http", "https"}
+            or not parsed.netloc
+            or not hostname
+            or any(character.isspace() for character in hostname)
+        ):
+            return False
+    return True
 
 
 def _normalize_source(source: str) -> str:
     return source.strip().lower()
 
 
-def _normalize_yaml_downloads(dictionary: dict) -> list[dict]:
-    if "downloads" in dictionary and isinstance(dictionary["downloads"], list):
-        return list(dictionary["downloads"])
+def _normalize_yaml_downloads(dictionary: Mapping) -> list[Mapping]:
+    providers = {name.casefold(): name for name in available_providers()}
+    provider_groups: dict[object, str] = {}
+    unknown = []
+    for key in dictionary:
+        if key in _GLOBAL_YAML_KEYS:
+            continue
+        if isinstance(key, str) and key.casefold() in providers:
+            canonical_name = providers[key.casefold()]
+            if canonical_name in provider_groups.values():
+                raise ValueError(f"duplicate legacy provider group for {canonical_name}")
+            provider_groups[key] = canonical_name
+        else:
+            unknown.append(key)
+    if unknown:
+        rendered = ", ".join(sorted((repr(key) for key in unknown)))
+        raise ValueError(f"YAML root contains unknown field(s): {rendered}")
+
+    if "downloads" in dictionary:
+        if provider_groups:
+            raise ValueError("downloads cannot be combined with legacy provider groups")
+        if not isinstance(dictionary["downloads"], list):
+            raise ValueError("downloads must be a list")
+        downloads = list(dictionary["downloads"])
+        if not all(isinstance(entry, Mapping) for entry in downloads):
+            raise ValueError("every downloads item must be a mapping")
+        return downloads
 
     downloads = []
     for key, value in dictionary.items():
-        if key in {"debug", "output", "proxy"}:
+        if key in _GLOBAL_YAML_KEYS:
             continue
-        if isinstance(value, list):
-            for entry in value:
-                entry_with_source = dict(entry)
-                entry_with_source.setdefault("source", key)
-                downloads.append(entry_with_source)
+        if not isinstance(value, list):
+            raise ValueError(f"{key} must be a list")
+        for entry in value:
+            if not isinstance(entry, Mapping):
+                raise ValueError(f"every {key} item must be a mapping")
+            entry_with_source = dict(entry)
+            entry_with_source.setdefault("source", provider_groups[key])
+            downloads.append(entry_with_source)
     return downloads
 
 
-def _extract_options(entry: dict) -> dict | None:
+def _extract_options(entry: Mapping) -> dict | None:
     options = {}
-    for key in ("translated_language", "content_rating", "data_saver"):
+    for key in ("translated_language", "content_rating"):
         if key in entry:
-            options[key] = entry.get(key)
+            options[key] = _string_list_value(entry.get(key), key)
+    if "data_saver" in entry:
+        options["data_saver"] = _bool_value(entry, "data_saver", False)
     return options or None
 
 
+def _download_request_from_yaml(
+    entry: Mapping,
+    *,
+    default_output: str,
+    default_proxy: dict | None,
+    default_debug: bool,
+    default_no_retry: bool,
+    default_no_progress: bool,
+) -> DownloadRequest:
+    _validate_mapping_keys(entry, _DOWNLOAD_YAML_KEYS, "download entry")
+    title = _text_value(entry.get("title"), "title")
+    source = _normalize_source(_text_value(entry.get("source", "fanfox"), "source"))
+    if source not in available_providers():
+        raise ValueError(f"unknown source {source!r}; choose one of: {', '.join(available_providers())}")
+    if source != "mangadex" and _MANGADEX_OPTION_KEYS.intersection(entry):
+        raise ValueError("translated_language, content_rating, and data_saver are supported only by MangaDex")
+    output = _text_value(entry.get("output", default_output), "output")
+    proxy = _proxy_value(entry.get("proxy", default_proxy), "proxy")
+
+    download_all = _bool_value(entry, "download_all_chapters", False)
+    download_last = _bool_value(entry, "download_last_chapter", False)
+    single = _optional_chapter_value(entry.get("download_single_chapter"), "download_single_chapter")
+    chapter_range = _optional_chapter_value(entry.get("download_chapters"), "download_chapters")
+    selectors = [download_all, download_last, single is not None, chapter_range is not None]
+    if sum(selectors) > 1:
+        raise ValueError("chapter selection fields are mutually exclusive")
+
+    return DownloadRequest(
+        title=title,
+        source=source,
+        output=output,
+        pdf=_bool_value(entry, "pdf", False),
+        proxy=proxy,
+        no_retry=_bool_value(entry, "no_retry", default_no_retry),
+        no_progress=_bool_value(entry, "no_progress", default_no_progress),
+        enable_debug_log=_bool_value(entry, "debug", default_debug),
+        download_all_chapters=download_all,
+        download_last_chapter=download_last,
+        download_single_chapter=single,
+        download_chapters=chapter_range,
+        options=_extract_options(entry),
+    )
+
+
+def _text_value(value: object, name: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{name} must be a non-empty string")
+    return value.strip()
+
+
+def _optional_chapter_value(value: object, name: str) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, (str, int, float)):
+        raise ValueError(f"{name} must be a chapter number or range string")
+    normalized = str(value).strip()
+    if not normalized:
+        raise ValueError(f"{name} cannot be empty")
+    return normalized
+
+
+def _bool_value(mapping: Mapping, name: str, default: bool) -> bool:
+    if name not in mapping:
+        return default
+    value = mapping[name]
+    if not isinstance(value, bool):
+        raise ValueError(f"{name} must be true or false")
+    return value
+
+
+def _proxy_value(value: object, name: str) -> dict | None:
+    if value is None:
+        return None
+    if not _is_valid_proxy(value):
+        raise ValueError(f"{name} must define http and https proxy URLs including their scheme")
+    return dict(value)
+
+
+def _string_list_value(value: object, name: str) -> list[str]:
+    values = [value] if isinstance(value, str) else value
+    if not isinstance(values, list) or not values or not all(isinstance(item, str) and item.strip() for item in values):
+        raise ValueError(f"{name} must be a non-empty string or list of non-empty strings")
+    return [item.strip() for item in values]
+
+
+def _validate_mapping_keys(mapping: Mapping, allowed: set[str], context: str) -> None:
+    unknown = [key for key in mapping if not isinstance(key, str) or key not in allowed]
+    if unknown:
+        rendered = ", ".join(sorted((repr(key) for key in unknown)))
+        raise ValueError(f"{context} contains unknown field(s): {rendered}")
+
+
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

@@ -42,11 +42,14 @@ uv sync
 
 By default, uv includes the `dev` dependency group; use `uv sync --no-dev` to exclude it.
 
-Run commands inside the environment:
+Run the deterministic, offline test suite inside the environment (this is the
+default pytest selection):
 
 ```
 uv run python -m pytest
 ```
+
+See [Tests.md](Tests.md) for the live-provider and complete-suite commands.
 
 Recreate the virtual env:
 
