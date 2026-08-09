@@ -31,9 +31,10 @@ git push origin "${release_version}"
 The release workflow validates that the tag matches `pyproject.toml`, builds
 the package, publishes it to PyPI with Trusted Publishing, updates the
 Homebrew formula URL and checksum, attempts to refresh Python resources, and
-then validates the formula. Homebrew ignores PyPI files uploaded in the last
-24 hours when resolving resources, so same-day releases may keep the existing
-resource blocks if dependencies did not change.
+then validates the formula. The resource refresh explicitly bypasses
+Homebrew's cooldown for newly uploaded main-package files, retries transient
+PyPI propagation failures, and stops the release rather than publishing stale
+dependency resources if every attempt fails.
 
 ## Manual build and publish
 
@@ -58,7 +59,7 @@ release_version="X.Y.Z"
 archive_path="/tmp/mangapy-${release_version}.tar.gz"
 curl --fail --location "https://github.com/alemar11/mangapy/archive/refs/tags/${release_version}.tar.gz" --output "${archive_path}"
 shasum -a 256 "${archive_path}"
-brew update-python-resources --exclude-packages pillow --package-name mangapy --version "${release_version}" Formula/mangapy.rb
+brew update-python-resources --ignore-main-package-cooldown --exclude-packages pillow --package-name mangapy --version "${release_version}" Formula/mangapy.rb
 brew audit --strict --online mangapy
 brew install --build-from-source mangapy
 brew test mangapy

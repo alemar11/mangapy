@@ -31,6 +31,7 @@ _DEFAULT_ICONS: dict[MessageKind, str] = {
 
 stdout = Console(theme=_THEME, markup=False, highlight=False)
 stderr = Console(theme=_THEME, markup=False, highlight=False, stderr=True)
+_managed_logging_handler: RichHandler | None = None
 
 
 def info(message: object, *, icon: str | None = None) -> None:
@@ -62,10 +63,14 @@ def suggestions(values: Iterable[object]) -> None:
 
 
 def configure_logging(debug: bool) -> None:
+    global _managed_logging_handler
+
     level = logging.DEBUG if debug else logging.ERROR
     root_logger = logging.getLogger()
     mangapy_logger = logging.getLogger("mangapy")
-    if not root_logger.handlers and not mangapy_logger.handlers:
+    if _managed_logging_handler in root_logger.handlers:
+        root_logger.setLevel(level)
+    elif not root_logger.handlers and not mangapy_logger.handlers:
         handler = RichHandler(
             console=stderr,
             show_time=False,
@@ -78,6 +83,7 @@ def configure_logging(debug: bool) -> None:
         handler.setFormatter(logging.Formatter("%(message)s"))
         root_logger.addHandler(handler)
         root_logger.setLevel(level)
+        _managed_logging_handler = handler
     mangapy_logger.setLevel(level)
 
 
