@@ -8,7 +8,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 
-def main():
+def main() -> int:
     if len(sys.argv) != 2:
         print("Usage: python3 scripts/dev_run.py <sample-filename.yaml>")
         sys.exit(2)
@@ -27,8 +27,8 @@ def main():
 
     # Local-only helper: run a sample YAML without touching the main CLI entrypoint.
     sys.argv = ["mangapy", "yaml", str(yaml_file)]
-    cli.main()
+    return cli.main()
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

@@ -16,23 +16,16 @@ uv lock --check
 3. Run the offline preflight tests:
 
 ```
-uv run --locked pytest -q \
-  tests/test_cli.py \
-  tests/test_providers.py \
-  tests/test_download_manager.py \
-  tests/test_chapter_archiver.py \
-  tests/test_thread_safety.py \
-  tests/test_fanfox_search.py \
-  tests/test_fanfox_packed_js.py \
-  tests/test_sort_key.py
+uv run --locked pytest -q -m "not live"
 ```
 
 4. Merge the release commit to `master`.
 5. Tag the release with the package version, without a `v` prefix:
 
 ```
-git tag 3.0.2
-git push origin 3.0.2
+release_version="X.Y.Z"
+git tag "${release_version}"
+git push origin "${release_version}"
 ```
 
 The release workflow validates that the tag matches `pyproject.toml`, builds
@@ -61,9 +54,11 @@ Then update the Homebrew formula in `alemar11/homebrew-tap` to point at the
 matching GitHub tag archive and refresh resources if dependency pins changed:
 
 ```
-curl -L https://github.com/alemar11/mangapy/archive/refs/tags/3.0.2.tar.gz -o /tmp/mangapy-3.0.2.tar.gz
-shasum -a 256 /tmp/mangapy-3.0.2.tar.gz
-brew update-python-resources --exclude-packages pillow --package-name mangapy --version 3.0.2 Formula/mangapy.rb
+release_version="X.Y.Z"
+archive_path="/tmp/mangapy-${release_version}.tar.gz"
+curl --fail --location "https://github.com/alemar11/mangapy/archive/refs/tags/${release_version}.tar.gz" --output "${archive_path}"
+shasum -a 256 "${archive_path}"
+brew update-python-resources --exclude-packages pillow --package-name mangapy --version "${release_version}" Formula/mangapy.rb
 brew audit --strict --online mangapy
 brew install --build-from-source mangapy
 brew test mangapy

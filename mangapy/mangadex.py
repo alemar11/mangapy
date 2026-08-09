@@ -1,3 +1,4 @@
+import math
 import threading
 import time
 
@@ -5,11 +6,15 @@ import requests
 
 from mangapy.capabilities import ProviderCapabilities
 from mangapy.mangarepository import Chapter, Manga, MangaRepository, Page
+from mangapy.pathutils import sanitize_filename_component
+
+MAX_RETRY_DELAY_SECONDS = 30.0
 
 
 class MangadexRepository(MangaRepository):
     name = "MangaDex"
     base_url = "https://api.mangadex.org"
+    proxies: dict[str, str] | None = None
 
     def __init__(self):
         self._session_local = threading.local()
@@ -78,36 +83,49 @@ class MangadexRepository(MangaRepository):
         chapters: list[Chapter] = []
         offset = 0
         limit = 100
+        requested_languages = list(translated_language)
+        expected_total: int | None = None
+        seen_chapter_uuids: set[str] = set()
         while True:
             params = {
                 "manga": manga_id,
                 "limit": limit,
                 "offset": offset,
                 "order[chapter]": "asc",
-                "translatedLanguage[]": translated_language,
+                "translatedLanguage[]": requested_languages,
                 "contentRating[]": content_rating,
             }
             payload = self._request_json(f"{self.base_url}/chapter", params=params)
             if payload is None:
-                break
+                raise RuntimeError(f"MangaDex chapter feed failed at offset {offset}; refusing partial results")
+            if not isinstance(payload, dict):
+                raise RuntimeError(f"MangaDex chapter feed returned an invalid payload at offset {offset}")
             data = payload.get("data", [])
+            if not isinstance(data, list):
+                raise RuntimeError(f"MangaDex chapter feed returned invalid data at offset {offset}")
             for item in data:
                 attributes = item.get("attributes", {})
+                chapter_uuid = item.get("id")
+                if not isinstance(chapter_uuid, str) or not chapter_uuid:
+                    raise RuntimeError(f"MangaDex chapter feed returned an item without an id at offset {offset}")
+                if chapter_uuid in seen_chapter_uuids:
+                    raise RuntimeError(f"MangaDex chapter feed returned duplicate id {chapter_uuid!r}")
+                seen_chapter_uuids.add(chapter_uuid)
                 chapter_id = attributes.get("chapter") or item.get("id")
                 number = _parse_float(attributes.get("chapter"))
                 volume = attributes.get("volume")
                 external_url = attributes.get("externalUrl")
-                translated_language = attributes.get("translatedLanguage")
+                chapter_language = attributes.get("translatedLanguage")
                 pages_count = attributes.get("pages")
                 sort_key = _chapter_sort_key(volume, attributes.get("chapter"), chapter_id)
                 chapter = MangadexChapter(
-                    first_page_url=f"{self.base_url}/at-home/server/{item.get('id')}",
+                    first_page_url=f"{self.base_url}/at-home/server/{chapter_uuid}",
                     chapter_id=chapter_id,
                     number=number,
                     volume=volume,
-                    chapter_uuid=item.get("id"),
+                    chapter_uuid=chapter_uuid,
                     external_url=external_url,
-                    translated_language=translated_language,
+                    translated_language=chapter_language,
                     pages_count=pages_count,
                     data_saver=data_saver,
                     sort_key=sort_key,
@@ -115,10 +133,16 @@ class MangadexRepository(MangaRepository):
                 )
                 chapters.append(chapter)
 
-            total = payload.get("total", 0)
-            offset += limit
-            if offset >= total:
+            reported_total = payload.get("total")
+            if not isinstance(reported_total, int) or reported_total < 0:
+                raise RuntimeError(f"MangaDex chapter feed returned an invalid total at offset {offset}")
+            expected_total = max(expected_total or 0, reported_total, offset + len(data))
+            if not data and offset < expected_total:
+                raise RuntimeError(f"MangaDex chapter feed ended before its declared total of {expected_total}")
+            offset += len(data)
+            if offset >= expected_total:
                 break
+        _validate_unique_output_names(chapters)
         return chapters
 
     def _get_session(self) -> requests.Session:
@@ -126,6 +150,9 @@ class MangadexRepository(MangaRepository):
         if session is None:
             session = requests.Session()
             self._session_local.session = session
+        session.proxies.clear()
+        if self.proxies:
+            session.proxies.update(self.proxies)
         return session
 
     def _request_json(self, url: str, params: dict | None = None) -> dict | None:
@@ -145,23 +172,21 @@ class MangadexRepository(MangaRepository):
                 return session.get(url, params=params, timeout=(10, 30))
             except requests.RequestException:
                 return None
-        last_error = None
-        for attempt in range(3):
+        max_attempts = 3
+        response = None
+        for attempt in range(max_attempts):
             self._apply_rate_limit()
             try:
                 response = session.get(url, params=params, timeout=(10, 30))
-            except requests.RequestException as exc:
-                last_error = exc
-                delay = _retry_delay(None, attempt)
-                time.sleep(delay)
+            except requests.RequestException:
+                if attempt < max_attempts - 1:
+                    time.sleep(_retry_delay(None, attempt))
                 continue
             if response.status_code == 429 or response.status_code >= 500:
-                delay = _retry_delay(response, attempt)
-                time.sleep(delay)
+                if attempt < max_attempts - 1:
+                    time.sleep(_retry_delay(response, attempt))
                 continue
             return response
-        if last_error:
-            return None
         return response
 
     def _apply_rate_limit(self) -> None:
@@ -206,33 +231,50 @@ class MangadexChapter(Chapter):
         self.pages_count = pages_count
         self.data_saver = data_saver
         self._requester = requester
+        if chapter_uuid:
+            # Chapter metadata can be corrected after publication. The UUID is
+            # the only immutable identity suitable for an idempotent path.
+            self.output_name = chapter_uuid
 
     def pages(self) -> list[Page]:
         if self.external_url:
             return []
+        if self.pages_count == 0:
+            return []
         if not self.chapter_uuid:
             return []
         if self._requester is None:
-            response = requests.get(
-                self.first_page_url,
-                timeout=(10, 30),
-                headers={"Accept": "application/json", "User-Agent": "mangapy"},
-            )
-            if response.status_code != 200:
+            try:
+                response = requests.get(
+                    self.first_page_url,
+                    timeout=(10, 30),
+                    headers={"Accept": "application/json", "User-Agent": "mangapy"},
+                )
+            except requests.RequestException:
                 return []
-            payload = response.json()
+            if response is None or response.status_code != 200:
+                return []
+            try:
+                payload = response.json()
+            except ValueError:
+                return []
         else:
-            payload = self._requester(self.first_page_url)
-        if payload is None:
+            try:
+                payload = self._requester(self.first_page_url)
+            except requests.RequestException:
+                return []
+        if not isinstance(payload, dict):
             return []
         if payload.get("result") != "ok":
             return []
         base_url = payload.get("baseUrl")
         chapter = payload.get("chapter", {})
+        if not isinstance(chapter, dict):
+            return []
         file_hash = chapter.get("hash")
         files = chapter.get("dataSaver") if self.data_saver else chapter.get("data")
         files = files or []
-        if not base_url or not file_hash:
+        if not base_url or not file_hash or not isinstance(files, list):
             return []
         pages = []
         for i, filename in enumerate(files):
@@ -295,26 +337,41 @@ def _parse_float(value: str | None) -> float | None:
     if value is None:
         return None
     try:
-        return float(value)
-    except ValueError:
+        number = float(value)
+    except TypeError, ValueError:
         return None
+    return number if math.isfinite(number) else None
 
 
 def _chapter_sort_key(volume: str | None, chapter: str | None, chapter_id: str):
     volume_number = _parse_float(volume)
     chapter_number = _parse_float(chapter)
     if chapter_number is not None:
-        if volume_number is not None:
-            return (0, volume_number, chapter_number, chapter_id)
-        return (0, chapter_number, chapter_id)
+        primary_number = volume_number if volume_number is not None else chapter_number
+        return (0, primary_number, chapter_number, str(chapter_id))
     if volume_number is not None:
-        return (1, volume_number, chapter_id)
-    return (2, chapter_id)
+        return (1, volume_number, 0.0, str(chapter_id))
+    return (2, 0.0, 0.0, str(chapter_id))
+
+
+def _validate_unique_output_names(chapters: list[Chapter]) -> None:
+    assigned_keys: set[str] = set()
+    for chapter in chapters:
+        candidate_key = sanitize_filename_component(chapter.output_name).casefold()
+        if candidate_key in assigned_keys:
+            raise RuntimeError("MangaDex chapter ids collide on the output filesystem")
+        assigned_keys.add(candidate_key)
 
 
 def _retry_delay(response: requests.Response | None, attempt: int) -> float:
     if response is not None:
         retry_after = response.headers.get("Retry-After")
-        if retry_after and retry_after.isdigit():
-            return float(retry_after)
+        if retry_after:
+            try:
+                retry_after_seconds = float(retry_after)
+            except ValueError:
+                pass
+            else:
+                if math.isfinite(retry_after_seconds) and retry_after_seconds >= 0:
+                    return min(retry_after_seconds, MAX_RETRY_DELAY_SECONDS)
     return min(2**attempt, 5)

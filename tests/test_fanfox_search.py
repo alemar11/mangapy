@@ -110,7 +110,7 @@ def test_search_fallback_uses_search_results():
     assert len(manga.chapters) == 2
 
 
-def test_fetch_chapterfun_links_uses_imagecount(monkeypatch):
+def test_fetch_chapterfun_links_rejects_a_partial_imagecount(monkeypatch):
     chapter = FanFoxChapter("https://fanfox.net/manga/test/c001/1.html", "001", 1.0, lambda: None)
     calls = []
 
@@ -131,4 +131,20 @@ def test_fetch_chapterfun_links_uses_imagecount(monkeypatch):
     links = chapter._fetch_chapterfun_links("https://fanfox.net/manga/test/c001", "123", 5, "")
 
     assert calls == [1, 3, 5]
-    assert links == ["url-data-1", "url-data-3", "url-data-5"]
+    assert links is None
+
+
+def test_fetch_chapterfun_links_accepts_the_declared_imagecount(monkeypatch):
+    chapter = FanFoxChapter("https://fanfox.net/manga/test/c001/1.html", "001", 1.0, lambda: None)
+
+    monkeypatch.setattr(chapter, "_one_link_helper", lambda page, base_url, cid, key: f"data-{page}")
+    monkeypatch.setattr(chapter, "_get_urls", lambda content: content)
+    monkeypatch.setattr(
+        chapter,
+        "_parse_links",
+        lambda data: [f"url-{data}-1", f"url-{data}-2"] if data == "data-1" else [f"url-{data}-1"],
+    )
+
+    links = chapter._fetch_chapterfun_links("https://fanfox.net/manga/test/c001", "123", 3, "")
+
+    assert links == ["url-data-1-1", "url-data-1-2", "url-data-3-1"]

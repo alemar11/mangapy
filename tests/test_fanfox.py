@@ -1,6 +1,9 @@
 import context  # noqa: F401
+import pytest
 
 from mangapy.fanfox import FanFoxRepository
+
+pytestmark = pytest.mark.live
 
 
 def test_fanfox_fetch_not_existing_manga():

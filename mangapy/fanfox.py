@@ -1,4 +1,5 @@
 import ast
+import math
 import re
 import threading
 from difflib import SequenceMatcher
@@ -15,9 +16,8 @@ from mangapy.utils import unpack
 
 def can_convert_to_float(value):
     try:
-        float(value)
-        return True
-    except ValueError:
+        return math.isfinite(float(value))
+    except TypeError, ValueError:
         return False
 
 
@@ -98,7 +98,7 @@ class FanFoxRepository(MangaRepository):
 
         return manga_chapters
 
-    def search(self, manga_name, options: dict | None = None) -> List[Manga]:
+    def search(self, manga_name, options: dict | None = None) -> Manga | None:
         manga_name_adjusted = _slugify_title(manga_name)
         manga_url = "{0}/manga/{1}/".format(self.base_url, manga_name_adjusted)
         manga = self._fetch_manga(manga_url, manga_name)
@@ -244,7 +244,7 @@ class FanFoxChapter(Chapter):
             except ValueError:
                 return None
             links += self._parse_links(unpacked)
-        return links
+        return links if len(links) == imagecount else None
 
     def _one_link_helper(self, page, base_url, cid, key):
         final_url = "{}/chapterfun.ashx?cid={}&page={}&key={}".format(base_url, cid, page, key)
@@ -303,6 +303,7 @@ class FanFoxChapter(Chapter):
                     pages.append(Page(i, link))
                 return pages
 
+        links = []
         if not len(page_numbers):
             # sometimes all the images are loaded in the same html page
             scripts = soup.find_all("script", {"type": "text/javascript"})
@@ -332,7 +333,16 @@ class FanFoxChapter(Chapter):
 
             for i in range(0, int(last_page_number / 2 + 0.5)):
                 data = self._one_link_helper((i * 2) + 1, base_url, cid, key)
-                links += self._parse_links(self._get_urls(data))
+                if not data:
+                    return []
+                try:
+                    unpacked = self._get_urls(data)
+                except ValueError:
+                    return []
+                links += self._parse_links(unpacked)
+
+            if len(links) != last_page_number:
+                return []
 
             for i, link in enumerate(links):
                 pages.append(Page(i, link))

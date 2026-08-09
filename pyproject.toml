@@ -23,6 +23,8 @@ classifiers = [
 dependencies = [
   "beautifulsoup4>=4.15.0",
   "img2pdf>=0.6.3",
+  "pikepdf>=10.5.0",
+  "pillow>=12.0.0",
   "pyyaml>=6.0.3",
   "requests>=2.34.2",
   "tqdm>=4.68.3",
@@ -52,3 +54,9 @@ ignore = ["E501"]
 
 [tool.ruff.format]
 line-ending = "lf"
+
+[tool.pytest.ini_options]
+addopts = "-m 'not live'"
+markers = [
+  "live: tests that contact real providers and require network access",
+]
