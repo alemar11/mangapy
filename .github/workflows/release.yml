@@ -1,22 +1,48 @@
 name: Release
 
+run-name: Publish ${{ inputs.tag || github.ref_name }}
+
 on:
   push:
     tags:
-      - "*.*.*"
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Exact existing final tag to publish
+        required: true
+        type: string
 
 permissions:
   contents: read
   id-token: write
 
 jobs:
+  resolve:
+    name: Resolve final release tag
+    uses: ./.github/workflows/release-version-dry-run.yml
+    with:
+      application_mode: true
+      operation: final
+      confirmed_tag: ${{ inputs.tag || github.ref_name }}
+      ref_name: ${{ format('release/{0}', inputs.tag || github.ref_name) }}
+      target_sha: ${{ github.sha }}
+    permissions:
+      contents: read
+
   release:
+    needs: resolve
+    if: >-
+      needs.resolve.outputs.application_ready == 'true' &&
+      needs.resolve.outputs.is_final == 'true' &&
+      needs.resolve.outputs.tag_state == 'existing-final'
     runs-on: macos-latest
     timeout-minutes: 60
 
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
+          ref: ${{ needs.resolve.outputs.tag }}
           fetch-depth: 0
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
@@ -27,19 +53,22 @@ jobs:
 
       - name: Validate release tag
         id: meta
+        env:
+          TAG: ${{ needs.resolve.outputs.tag }}
         run: |
           set -euo pipefail
-          version="${GITHUB_REF_NAME}"
-          if [[ ! "${version}" =~ ^[0-9]+[.][0-9]+[.][0-9]+$ ]]; then
-            echo "Release tags must use X.Y.Z format, got ${GITHUB_REF_NAME}" >&2
+          tag="${TAG}"
+          if [[ ! "${tag}" =~ ^v(0|[1-9][0-9]*)[.](0|[1-9][0-9]*)[.](0|[1-9][0-9]*)$ ]]; then
+            echo "Release tags must use final vX.Y.Z format, got ${tag}" >&2
             exit 1
           fi
+          version="${tag#v}"
           project_version="$(python -c 'import pathlib, tomllib; print(tomllib.loads(pathlib.Path("pyproject.toml").read_text())["project"]["version"])')"
           if [[ "${version}" != "${project_version}" ]]; then
             echo "Tag ${version} does not match pyproject.toml version ${project_version}" >&2
             exit 1
           fi
-          archive_url="https://github.com/alemar11/mangapy/archive/refs/tags/${version}.tar.gz"
+          archive_url="https://github.com/alemar11/mangapy/archive/refs/tags/${tag}.tar.gz"
           echo "version=${version}" >> "${GITHUB_OUTPUT}"
           echo "archive_url=${archive_url}" >> "${GITHUB_OUTPUT}"
 
@@ -68,12 +97,15 @@ jobs:
 
       - name: Compute source archive checksum
         id: archive
+        env:
+          ARCHIVE_URL: ${{ steps.meta.outputs.archive_url }}
+          VERSION: ${{ steps.meta.outputs.version }}
         run: |
           set -euo pipefail
           curl --fail --location --silent --show-error \
-            "${{ steps.meta.outputs.archive_url }}" \
-            --output mangapy-${{ steps.meta.outputs.version }}.tar.gz
-          sha256="$(shasum -a 256 mangapy-${{ steps.meta.outputs.version }}.tar.gz | awk '{print $1}')"
+            "${ARCHIVE_URL}" \
+            --output "mangapy-${VERSION}.tar.gz"
+          sha256="$(shasum -a 256 "mangapy-${VERSION}.tar.gz" | awk '{print $1}')"
           echo "sha256=${sha256}" >> "${GITHUB_OUTPUT}"
 
       - name: Check out Homebrew tap
@@ -180,6 +212,8 @@ jobs:
 
       - name: Commit Homebrew formula
         working-directory: homebrew-tap
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
@@ -189,5 +223,5 @@ jobs:
             echo "Homebrew formula is already up to date."
             exit 0
           fi
-          git commit -m "Update mangapy to ${{ steps.meta.outputs.version }}"
+          git commit -m "Update mangapy to ${VERSION}"
           git push
