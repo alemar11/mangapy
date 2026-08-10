@@ -1,0 +1,380 @@
+# g:versioning release workflow template; resolver API 0.2.0
+name: Release version (apply)
+
+run-name: Apply · ${{ inputs.confirmed_tag }} · ${{ github.ref_name }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmed_tag:
+        description: Exact canonical tag shown by Release version (dry run)
+        required: true
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: release-version-apply-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  resolve:
+    name: Revalidate exact confirmation
+    uses: ./.github/workflows/release-version-dry-run.yml
+    with:
+      application_mode: true
+      operation: auto
+      confirmed_tag: ${{ inputs.confirmed_tag }}
+      ref_name: ${{ github.ref_name }}
+      target_sha: ${{ github.sha }}
+    permissions:
+      contents: read
+
+  candidate:
+    name: Create candidate tag and release branch
+    if: >-
+      needs.resolve.outputs.application_ready == 'true' &&
+      needs.resolve.outputs.is_final == 'false' &&
+      needs.resolve.outputs.kind == 'candidate'
+    needs: resolve
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Revalidate and create immutable candidate refs
+        env:
+          CONTEXT: ${{ needs.resolve.outputs.context }}
+          DEFAULT_BRANCH: ${{ needs.resolve.outputs.default_branch }}
+          EXPECTED_TAG_SNAPSHOT: ${{ needs.resolve.outputs.tag_snapshot }}
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_BRANCH: ${{ needs.resolve.outputs.release_branch }}
+          TAG: ${{ needs.resolve.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tags_file="$RUNNER_TEMP/release-tags.txt"
+          gh api --paginate \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "repos/${GITHUB_REPOSITORY}/git/matching-refs/tags/" \
+            --jq '.[].ref | sub("^refs/tags/"; "")' \
+            | LC_ALL=C sort -u > "$tags_file"
+          current_tag_snapshot="$(sha256sum "$tags_file" | cut -d ' ' -f 1)"
+          if [[ "$current_tag_snapshot" != "$EXPECTED_TAG_SNAPSHOT" ]]; then
+            echo "The tag set changed after resolution; run the dry run and Release version (apply) again." >&2
+            exit 1
+          fi
+
+          canonical_tag_pattern='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-rc\.[1-9][0-9]*)?$'
+          release_branch_pattern='^release/v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
+          if [[ ! "$TAG" =~ $canonical_tag_pattern ]]; then
+            echo "Refusing a noncanonical tag; expected vX.Y.Z or vX.Y.Z-rc.N." >&2
+            exit 1
+          fi
+          if [[ ! "$RELEASE_BRANCH" =~ $release_branch_pattern ]]; then
+            echo "Refusing a noncanonical release branch." >&2
+            exit 1
+          fi
+
+          current_default_branch="$(gh api "repos/${GITHUB_REPOSITORY}" --jq .default_branch)"
+          if [[ "$current_default_branch" != "$DEFAULT_BRANCH" ]]; then
+            echo "The default branch changed after resolution; run the dry run and Release version (apply) again." >&2
+            exit 1
+          fi
+
+          ref_sha() {
+            local namespace="$1"
+            local name="$2"
+            local exact_ref="refs/${namespace}/${name}"
+            gh api "repos/${GITHUB_REPOSITORY}/git/matching-refs/${namespace}/${name}" \
+              | jq -r --arg exact_ref "$exact_ref" \
+                '[.[] | select(.ref == $exact_ref) | .object.sha][0] // empty'
+          }
+
+          selected_sha="$(ref_sha heads "$GITHUB_REF_NAME")"
+          if [[ "$selected_sha" != "$GITHUB_SHA" ]]; then
+            echo "The selected branch changed after dispatch; refusing a stale SHA." >&2
+            exit 1
+          fi
+
+          target_sha="$GITHUB_SHA"
+          branch_ref="refs/heads/${RELEASE_BRANCH}"
+          branch_sha="$(ref_sha heads "$RELEASE_BRANCH")"
+          if [[ "$CONTEXT" == "default" ]]; then
+            if [[ -z "$branch_sha" ]]; then
+              gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+                --raw-field ref="$branch_ref" \
+                --raw-field sha="$target_sha" >/dev/null
+            elif [[ "$branch_sha" != "$target_sha" ]]; then
+              echo "$RELEASE_BRANCH exists at a different SHA; refusing to move it." >&2
+              exit 1
+            fi
+          elif [[ "$CONTEXT" != "release" || "$RELEASE_BRANCH" != "$GITHUB_REF_NAME" ]]; then
+            echo "The resolved context no longer matches the selected branch." >&2
+            exit 1
+          fi
+
+          branch_sha="$(ref_sha heads "$RELEASE_BRANCH")"
+          if [[ "$branch_sha" != "$target_sha" ]]; then
+            echo "$RELEASE_BRANCH was not verified at the selected SHA." >&2
+            exit 1
+          fi
+
+          if [[ -n "$(ref_sha tags "$TAG")" ]]; then
+            echo "$TAG already exists; refusing to recreate or move it." >&2
+            exit 1
+          fi
+
+          tag_object_sha="$(
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/git/tags" \
+              --raw-field tag="$TAG" \
+              --raw-field message="Create immutable release candidate $TAG" \
+              --raw-field object="$target_sha" \
+              --raw-field type=commit \
+              --jq .sha
+          )"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+            --raw-field ref="refs/tags/${TAG}" \
+            --raw-field sha="$tag_object_sha" >/dev/null
+
+          read -r tag_type tag_sha < <(
+            gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${TAG}" \
+              --jq '[.object.type, .object.sha] | @tsv'
+          )
+          if [[ "$tag_type" != "tag" ]]; then
+            echo "Expected an annotated tag object for $TAG." >&2
+            exit 1
+          fi
+          resolved_sha="$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/${tag_sha}" --jq .object.sha)"
+          if [[ "$resolved_sha" != "$target_sha" ]]; then
+            echo "$TAG does not resolve to the selected SHA." >&2
+            exit 1
+          fi
+
+          {
+            echo "## Candidate refs created"
+            echo
+            echo "- Tag: \`$TAG\`"
+            echo "- Release branch: \`$RELEASE_BRANCH\`"
+            echo "- Commit: \`$target_sha\`"
+            echo
+            echo "No application source or package metadata was read, edited, or committed."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  final:
+    name: Create final tag and reconcile release PR
+    if: >-
+      needs.resolve.outputs.application_ready == 'true' &&
+      needs.resolve.outputs.is_final == 'true' &&
+      needs.resolve.outputs.kind == 'final'
+    needs: resolve
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+      pull-requests: write
+    steps:
+      - name: Revalidate and create immutable final tag
+        env:
+          DEFAULT_BRANCH: ${{ needs.resolve.outputs.default_branch }}
+          EXPECTED_TAG_SNAPSHOT: ${{ needs.resolve.outputs.tag_snapshot }}
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_BRANCH: ${{ needs.resolve.outputs.release_branch }}
+          TAG: ${{ needs.resolve.outputs.tag }}
+          TAG_STATE: ${{ needs.resolve.outputs.tag_state }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tags_file="$RUNNER_TEMP/release-tags.txt"
+          gh api --paginate \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "repos/${GITHUB_REPOSITORY}/git/matching-refs/tags/" \
+            --jq '.[].ref | sub("^refs/tags/"; "")' \
+            | LC_ALL=C sort -u > "$tags_file"
+          current_tag_snapshot="$(sha256sum "$tags_file" | cut -d ' ' -f 1)"
+          if [[ "$current_tag_snapshot" != "$EXPECTED_TAG_SNAPSHOT" ]]; then
+            echo "The tag set changed after resolution; run the dry run and Release version (apply) again." >&2
+            exit 1
+          fi
+
+          canonical_tag_pattern='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-rc\.[1-9][0-9]*)?$'
+          release_branch_pattern='^release/v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
+          if [[ ! "$TAG" =~ $canonical_tag_pattern ]]; then
+            echo "Refusing a noncanonical tag; expected vX.Y.Z or vX.Y.Z-rc.N." >&2
+            exit 1
+          fi
+          if [[ ! "$RELEASE_BRANCH" =~ $release_branch_pattern ]]; then
+            echo "Refusing a noncanonical release branch." >&2
+            exit 1
+          fi
+          if [[ "$TAG_STATE" != "absent" && "$TAG_STATE" != "existing-final" ]]; then
+            echo "Unexpected tag state; refusing final release mutation." >&2
+            exit 1
+          fi
+
+          current_default_branch="$(gh api "repos/${GITHUB_REPOSITORY}" --jq .default_branch)"
+          if [[ "$current_default_branch" != "$DEFAULT_BRANCH" ]]; then
+            echo "The default branch changed after resolution; run the dry run and Release version (apply) again." >&2
+            exit 1
+          fi
+
+          ref_sha() {
+            local namespace="$1"
+            local name="$2"
+            local exact_ref="refs/${namespace}/${name}"
+            gh api "repos/${GITHUB_REPOSITORY}/git/matching-refs/${namespace}/${name}" \
+              | jq -r --arg exact_ref "$exact_ref" \
+                '[.[] | select(.ref == $exact_ref) | .object.sha][0] // empty'
+          }
+
+          selected_sha="$(ref_sha heads "$GITHUB_REF_NAME")"
+          if [[
+            "$RELEASE_BRANCH" != "$GITHUB_REF_NAME" ||
+            "$selected_sha" != "$GITHUB_SHA"
+          ]]; then
+            echo "The selected release branch changed after dispatch; refusing a stale SHA." >&2
+            exit 1
+          fi
+
+          target_sha="$GITHUB_SHA"
+          existing_tag_sha="$(ref_sha tags "$TAG")"
+          if [[ "$TAG_STATE" == "absent" ]]; then
+            if [[ -n "$existing_tag_sha" ]]; then
+              echo "$TAG appeared after validation; refusing to recreate or move it." >&2
+              exit 1
+            fi
+            tag_object_sha="$(
+              gh api --method POST "repos/${GITHUB_REPOSITORY}/git/tags" \
+                --raw-field tag="$TAG" \
+                --raw-field message="Create immutable final release $TAG" \
+                --raw-field object="$target_sha" \
+                --raw-field type=commit \
+                --jq .sha
+            )"
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+              --raw-field ref="refs/tags/${TAG}" \
+              --raw-field sha="$tag_object_sha" >/dev/null
+          elif [[ -z "$existing_tag_sha" ]]; then
+            echo "The existing final tag disappeared; refusing to recreate it." >&2
+            exit 1
+          fi
+
+          read -r object_type object_sha < <(
+            gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${TAG}" \
+              --jq '[.object.type, .object.sha] | @tsv'
+          )
+          for _ in 1 2 3 4 5; do
+            if [[ "$object_type" == "commit" ]]; then
+              break
+            fi
+            if [[ "$object_type" != "tag" ]]; then
+              echo "Unsupported tag target type: $object_type" >&2
+              exit 1
+            fi
+            read -r object_type object_sha < <(
+              gh api "repos/${GITHUB_REPOSITORY}/git/tags/${object_sha}" \
+                --jq '[.object.type, .object.sha] | @tsv'
+            )
+          done
+          if [[ "$object_type" != "commit" || "$object_sha" != "$target_sha" ]]; then
+            echo "$TAG does not resolve to the selected SHA; refusing to move it." >&2
+            exit 1
+          fi
+
+      - name: Dispatch stable publish workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.resolve.outputs.tag }}
+          TAG_STATE: ${{ needs.resolve.outputs.tag_state }}
+        if: ${{ needs.resolve.outputs.tag_state == 'absent' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$TAG_STATE" != "absent" ]]; then
+            echo "The stable tag already existed; publish dispatch is not repeated."
+            exit 0
+          fi
+          gh workflow run release.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref "$TAG" \
+            --field tag="$TAG"
+
+      - name: Create a PR to the default branch only when differences exist
+        env:
+          DEFAULT_BRANCH: ${{ needs.resolve.outputs.default_branch }}
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_BRANCH: ${{ needs.resolve.outputs.release_branch }}
+          TAG: ${{ needs.resolve.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ahead_by="$(
+            gh api "repos/${GITHUB_REPOSITORY}/compare/${DEFAULT_BRANCH}...${RELEASE_BRANCH}" \
+              --jq .ahead_by
+          )"
+          if [[ "$ahead_by" == "0" ]]; then
+            {
+              echo "## Final release completed"
+              echo
+              echo "- Tag: \`$TAG\`"
+              echo "- Commit: \`$GITHUB_SHA\`"
+              echo "- Pull request: not created because \`$RELEASE_BRANCH\` has no changes for \`$DEFAULT_BRANCH\`"
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          owner="${GITHUB_REPOSITORY%%/*}"
+          open_prs="$(
+            gh api --method GET "repos/${GITHUB_REPOSITORY}/pulls" \
+              -f state=open \
+              -f base="$DEFAULT_BRANCH" \
+              -f head="${owner}:${RELEASE_BRANCH}"
+          )"
+          pr_count="$(jq length <<< "$open_prs")"
+          if (( pr_count > 1 )); then
+            echo "Multiple matching open pull requests exist; refusing an ambiguous update." >&2
+            exit 1
+          fi
+
+          if (( pr_count == 1 )); then
+            pr_payload="$(jq '.[0]' <<< "$open_prs")"
+            pr_status="reused"
+          else
+            pr_payload="$(
+              gh api --method POST "repos/${GITHUB_REPOSITORY}/pulls" \
+                --raw-field title="Release $TAG" \
+                --raw-field head="$RELEASE_BRANCH" \
+                --raw-field base="$DEFAULT_BRANCH" \
+                --raw-field body="Synchronize $RELEASE_BRANCH into $DEFAULT_BRANCH after immutable final tag $TAG. This workflow never merges the pull request automatically."
+            )"
+            pr_status="created"
+          fi
+
+          read -r pr_url pr_state pr_base pr_head pr_repo < <(
+            jq -r '[.html_url, .state, .base.ref, .head.ref, .head.repo.full_name] | @tsv' \
+              <<< "$pr_payload"
+          )
+          if [[
+            "$pr_state" != "open" ||
+            "$pr_base" != "$DEFAULT_BRANCH" ||
+            "$pr_head" != "$RELEASE_BRANCH" ||
+            "$pr_repo" != "$GITHUB_REPOSITORY"
+          ]]; then
+            echo "The pull request readback does not match the exact release branch and default branch." >&2
+            exit 1
+          fi
+
+          {
+            echo "## Final release completed"
+            echo
+            echo "- Tag: \`$TAG\`"
+            echo "- Commit: \`$GITHUB_SHA\`"
+            echo "- Pull request: $pr_status — $pr_url"
+            echo "- Automatic merge: disabled by workflow design"
+            echo
+            echo "No application source or package metadata was read, edited, or committed."
+          } >> "$GITHUB_STEP_SUMMARY"
