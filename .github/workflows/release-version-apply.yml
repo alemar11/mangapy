@@ -1,15 +1,21 @@
 # g:versioning release workflow template; resolver API 0.2.0
 name: Release version (apply)
 
-run-name: Apply · ${{ inputs.confirmed_tag }} · ${{ github.ref_name }}
+run-name: Apply · ${{ inputs.operation }} · ${{ github.ref_name }}
 
 on:
   workflow_dispatch:
     inputs:
-      confirmed_tag:
-        description: Exact canonical tag shown by Release version (dry run)
+      operation:
+        description: Select the operation that matches the branch chosen above
         required: true
-        type: string
+        type: choice
+        options:
+          - "[patch] Default branch → vX.Y.(Z+1)-rc.1"
+          - "[minor] Default branch → vX.(Y+1).0-rc.1"
+          - "[major] Default branch → v(X+1).0.0-rc.1"
+          - "[candidate] release/vX.Y.Z → vX.Y.Z-rc.N"
+          - "[final] release/vX.Y.Z → vX.Y.Z"
 
 permissions: {}
 
@@ -18,13 +24,25 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  plan:
+    name: Resolve requested operation
+    uses: ./.github/workflows/release-version-dry-run.yml
+    with:
+      application_mode: false
+      operation: ${{ inputs.operation }}
+      ref_name: ${{ github.ref_name }}
+      target_sha: ${{ github.sha }}
+    permissions:
+      contents: read
+
   resolve:
-    name: Revalidate exact confirmation
+    name: Revalidate calculated tag
+    needs: plan
     uses: ./.github/workflows/release-version-dry-run.yml
     with:
       application_mode: true
-      operation: auto
-      confirmed_tag: ${{ inputs.confirmed_tag }}
+      operation: ${{ inputs.operation }}
+      confirmed_tag: ${{ needs.plan.outputs.tag }}
       ref_name: ${{ github.ref_name }}
       target_sha: ${{ github.sha }}
     permissions:
