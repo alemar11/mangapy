@@ -1,19 +1,46 @@
 {
-  // Use IntelliSense to learn about possible attributes.
-  // Hover to view descriptions of existing attributes.
-  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Current file",
-      "type": "python",
+      "name": "Python: Current file",
+      "type": "debugpy",
       "request": "launch",
       "program": "${file}",
-      "cwd": "${workspaceRoot}",
-      "env": {
-        "PYTHONPATH": "${workspaceRoot}"
-      },
+      "cwd": "${workspaceFolder}",
       "console": "integratedTerminal"
+    },
+    {
+      "name": "Python: MangaPy CLI",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "mangapy.cli",
+      "args": [
+        "--version"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Python: All offline tests",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": [
+        "-q"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": false
+    },
+    {
+      "name": "Python: Debug selected test",
+      "type": "debugpy",
+      "request": "launch",
+      "purpose": [
+        "debug-test"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": false
     }
   ]
 }

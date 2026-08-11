@@ -1,0 +1,18 @@
+[tools]
+python = "3.14"
+uv = "latest"
+
+[tasks.setup]
+description = "Create or update the project virtual environment"
+run = "uv sync"
+
+[tasks.lint]
+description = "Check linting and formatting with Ruff"
+run = [
+  "uv run ruff check .",
+  "uv run ruff format --check .",
+]
+
+[tasks.test]
+description = "Run the deterministic offline test suite"
+run = "uv run pytest -q"
