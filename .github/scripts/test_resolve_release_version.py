@@ -11,6 +11,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 ASSET = Path(__file__).resolve().parent / "resolve_release_version.py"
 DRY_RUN_WORKFLOW = PROJECT_ROOT / "workflows" / "release-version-dry-run.yml"
 APPLY_WORKFLOW = PROJECT_ROOT / "workflows" / "release-version-apply.yml"
+APPROVAL_TEST_WORKFLOW = PROJECT_ROOT / "workflows" / "release-version-approval-test.yml"
 RELEASE_WORKFLOW = PROJECT_ROOT / "workflows" / "release.yml"
 
 
@@ -160,10 +161,12 @@ class ReleaseResolverAssetTests(unittest.TestCase):
         self.assertIn('--repo "$GITHUB_REPOSITORY"', apply)
         self.assertIn('--field tag="$TAG"', apply)
 
-    def test_apply_ui_matches_dry_run_operation_choices(self) -> None:
+    def test_apply_and_approval_ui_match_dry_run_operation_choices(self) -> None:
         dry_run = DRY_RUN_WORKFLOW.read_text(encoding="utf-8")
         apply = APPLY_WORKFLOW.read_text(encoding="utf-8")
+        approval = APPROVAL_TEST_WORKFLOW.read_text(encoding="utf-8")
         apply_dispatch = apply.split("\npermissions: {}", 1)[0]
+        approval_dispatch = approval.split("\npermissions: {}", 1)[0]
         for option in (
             '"[patch] Default branch → vX.Y.(Z+1)-rc.1"',
             '"[minor] Default branch → vX.(Y+1).0-rc.1"',
@@ -173,10 +176,22 @@ class ReleaseResolverAssetTests(unittest.TestCase):
         ):
             self.assertIn(option, dry_run)
             self.assertIn(option, apply_dispatch)
+            self.assertIn(option, approval_dispatch)
         self.assertNotIn("confirmed_tag", apply_dispatch)
         self.assertIn("needs: plan", apply)
         self.assertIn("application_mode: false", apply)
         self.assertIn("confirmed_tag: ${{ needs.plan.outputs.tag }}", apply)
+
+    def test_approval_workflow_exposes_the_tag_without_mutating_refs(self) -> None:
+        workflow = APPROVAL_TEST_WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn("name: Approve proposed tag ${{ needs.plan.outputs.tag }}", workflow)
+        self.assertIn("needs.plan.outputs.status == 'proposal-ready'", workflow)
+        self.assertIn("name: release-approval-test", workflow)
+        self.assertIn("deployment: false", workflow)
+        self.assertIn("No tag, branch, release, pull request", workflow)
+        self.assertNotIn("contents: write", workflow)
+        self.assertNotIn("--method POST", workflow)
+        self.assertNotIn("git push", workflow)
 
     def test_asset_has_no_project_or_network_dependency(self) -> None:
         source = ASSET.read_text(encoding="utf-8")
