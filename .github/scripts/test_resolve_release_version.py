@@ -160,6 +160,24 @@ class ReleaseResolverAssetTests(unittest.TestCase):
         self.assertIn('--repo "$GITHUB_REPOSITORY"', apply)
         self.assertIn('--field tag="$TAG"', apply)
 
+    def test_apply_ui_matches_dry_run_operation_choices(self) -> None:
+        dry_run = DRY_RUN_WORKFLOW.read_text(encoding="utf-8")
+        apply = APPLY_WORKFLOW.read_text(encoding="utf-8")
+        apply_dispatch = apply.split("\npermissions: {}", 1)[0]
+        for option in (
+            '"[patch] Default branch → vX.Y.(Z+1)-rc.1"',
+            '"[minor] Default branch → vX.(Y+1).0-rc.1"',
+            '"[major] Default branch → v(X+1).0.0-rc.1"',
+            '"[candidate] release/vX.Y.Z → vX.Y.Z-rc.N"',
+            '"[final] release/vX.Y.Z → vX.Y.Z"',
+        ):
+            self.assertIn(option, dry_run)
+            self.assertIn(option, apply_dispatch)
+        self.assertNotIn("confirmed_tag", apply_dispatch)
+        self.assertIn("needs: plan", apply)
+        self.assertIn("application_mode: false", apply)
+        self.assertIn("confirmed_tag: ${{ needs.plan.outputs.tag }}", apply)
+
     def test_asset_has_no_project_or_network_dependency(self) -> None:
         source = ASSET.read_text(encoding="utf-8")
         self.assertNotIn("package.json", source)
