@@ -91,6 +91,7 @@ mangapy title bleach
 | Use MangaDex | `mangapy title bleach --chapter 1 --source mangadex` |
 | Choose an output directory | `mangapy title bleach --chapter 1 --out ~/Downloads` |
 | Create one PDF per chapter | `mangapy title bleach --all --pdf` |
+| Redownload an existing chapter | `mangapy title bleach --chapter 1 --force` |
 
 Chapter ranges are inclusive. Open-ended ranges are supported too:
 
@@ -115,6 +116,13 @@ Disable the progress display for scripts and compact logs:
 
 ```console
 mangapy title bleach --chapter 1 --no-progress
+```
+
+Force a fresh download of the selected chapters while preserving the current
+files until each replacement has downloaded successfully:
+
+```console
+mangapy title bleach --chapter 1 --force
 ```
 
 Set [`NO_COLOR`](https://no-color.org/) to disable terminal colors while
@@ -151,6 +159,7 @@ mangapy yaml path/to/downloads.yaml
 ```yaml
 ---
 debug: false
+force: false
 no_retry: false
 no_progress: false
 output: "~/Downloads/mangapy"
@@ -174,7 +183,7 @@ downloads:
 ```
 
 Global settings act as defaults. A download entry can override `debug`,
-`no_retry`, `no_progress`, `output`, and `proxy` for that title.
+`force`, `no_retry`, `no_progress`, `output`, and `proxy` for that title.
 
 ### Chapter selectors
 
@@ -216,6 +225,7 @@ These fields are valid only when `source: mangadex`:
 | `output` | string | Default output directory. |
 | `proxy` | mapping | Default `http` and `https` proxy URLs. |
 | `debug` | boolean | Enable debug logging. |
+| `force` | boolean | Redownload and replace existing chapter files. |
 | `no_retry` | boolean | Disable network retries. |
 | `no_progress` | boolean | Disable progress output. |
 
@@ -229,6 +239,7 @@ These fields are valid only when `source: mangadex`:
 | `pdf` | boolean | Create one PDF for each selected chapter. |
 | `proxy` | mapping | Override the global proxy. |
 | `debug` | boolean | Override global debug logging. |
+| `force` | boolean | Override the global forced-download setting. |
 | `no_retry` | boolean | Override the global retry setting. |
 | `no_progress` | boolean | Override the global progress setting. |
 | `download_single_chapter` | string or number | Select one chapter. |

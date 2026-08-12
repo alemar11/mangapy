@@ -198,6 +198,7 @@ def test_download_manager_passes_proxy_to_repository_and_archiver(monkeypatch, t
 
     def fake_archive_with_archiver(archiver, chapter, pdf, headers):
         observed["archiver_proxies"] = archiver.proxies
+        observed["archiver_force"] = archiver.force
         return _downloaded(chapter)
 
     monkeypatch.setattr("mangapy.download_manager._archive_with_archiver", fake_archive_with_archiver)
@@ -207,6 +208,7 @@ def test_download_manager_passes_proxy_to_repository_and_archiver(monkeypatch, t
             title="dummy",
             source="fanfox",
             output=str(tmp_path),
+            force=True,
             proxy=proxy,
         )
     )
@@ -214,6 +216,7 @@ def test_download_manager_passes_proxy_to_repository_and_archiver(monkeypatch, t
     assert result.succeeded
     assert repo.proxies == proxy
     assert observed["archiver_proxies"] == proxy
+    assert observed["archiver_force"] is True
 
 
 def test_download_result_reports_partial_failure():

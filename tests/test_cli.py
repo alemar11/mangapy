@@ -37,6 +37,7 @@ def test_cmd_parse_title(monkeypatch):
         "bleach",
         "-a",
         "--pdf",
+        "--force",
         "-o",
         "/tmp/out",
         "-p",
@@ -49,6 +50,7 @@ def test_cmd_parse_title(monkeypatch):
     assert args.manga_title == "bleach"
     assert args.all is True
     assert args.pdf is True
+    assert args.force is True
     assert args.out == "/tmp/out"
     assert args.proxy == {"http": "http://proxy.example:8080", "https": "http://proxy.example:8080"}
 
@@ -147,6 +149,7 @@ def test_main_title_source_and_range(monkeypatch):
         proxy=None,
         all=False,
         chapter="1-3",
+        force=True,
         no_progress=False,
     )
 
@@ -155,6 +158,7 @@ def test_main_title_source_and_range(monkeypatch):
     request = captured["request"]
     assert request.source == "mangadex"
     assert request.pdf is True
+    assert request.force is True
     assert request.enable_debug_log is True
     assert request.download_single_chapter is None
     assert request.download_chapters == "1-3"
@@ -206,6 +210,7 @@ def test_main_yaml_downloads_list(monkeypatch, tmp_path):
     payload = {
         "output": "/tmp/root",
         "debug": True,
+        "force": True,
         "proxy": {"http": "http://proxy.example:8080", "https": "http://proxy.example:8080"},
         "downloads": [
             {
@@ -224,6 +229,7 @@ def test_main_yaml_downloads_list(monkeypatch, tmp_path):
                 "output": "/tmp/override",
                 "proxy": {"http": "http://proxy2.example:8080", "https": "http://proxy2.example:8080"},
                 "download_single_chapter": "5",
+                "force": False,
             },
         ],
     }
@@ -243,6 +249,7 @@ def test_main_yaml_downloads_list(monkeypatch, tmp_path):
         "https": "http://proxy.example:8080",
     }
     assert first.download_all_chapters is True
+    assert first.force is True
     assert first.no_progress is True
     assert first.options == {
         "translated_language": ["it"],
@@ -258,6 +265,7 @@ def test_main_yaml_downloads_list(monkeypatch, tmp_path):
         "https": "http://proxy2.example:8080",
     }
     assert second.download_single_chapter == "5"
+    assert second.force is False
 
 
 def test_cmd_parse_requires_subcommand(monkeypatch):

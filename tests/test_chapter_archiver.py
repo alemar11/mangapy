@@ -390,6 +390,44 @@ def test_images_are_atomic_zero_byte_files_are_retried_and_complete_download_is_
     assert list(chapter_path.glob("*.tmp")) == []
 
 
+def test_force_redownloads_an_existing_valid_image(tmp_path, monkeypatch):
+    chapter_path = tmp_path / "images" / "1"
+    chapter_path.mkdir(parents=True)
+    existing_bytes = _png_bytes()
+    (chapter_path / "0.jpg").write_bytes(existing_bytes)
+    archiver = ChapterArchiver(str(tmp_path), max_workers=1, force=True)
+    calls = []
+
+    def fetch_image(self, url, headers):
+        calls.append(url)
+        return _transparent_png_bytes()
+
+    monkeypatch.setattr(ChapterArchiver, "_fetch_image", fetch_image)
+    chapter = DummyChapter(1.0, [Page(0, "https://example.com/0.jpg")])
+
+    result = archiver.archive(chapter, pdf=False, headers=None)
+
+    assert result.status == "downloaded"
+    assert calls == ["https://example.com/0.jpg"]
+    assert (chapter_path / "0.jpg").read_bytes() != existing_bytes
+
+
+def test_failed_forced_image_download_preserves_the_existing_file(tmp_path, monkeypatch):
+    chapter_path = tmp_path / "images" / "1"
+    chapter_path.mkdir(parents=True)
+    existing_bytes = _png_bytes()
+    image_path = chapter_path / "0.jpg"
+    image_path.write_bytes(existing_bytes)
+    archiver = ChapterArchiver(str(tmp_path), max_workers=1, retry_enabled=False, force=True)
+    monkeypatch.setattr(ChapterArchiver, "_fetch_image", lambda self, url, headers: None)
+    chapter = DummyChapter(1.0, [Page(0, "https://example.com/0.jpg")])
+
+    result = archiver.archive(chapter, pdf=False, headers=None)
+
+    assert result.status == "failed"
+    assert image_path.read_bytes() == existing_bytes
+
+
 def test_failed_atomic_image_replace_leaves_no_final_or_temporary_file(tmp_path, monkeypatch):
     archiver = ChapterArchiver(str(tmp_path), max_workers=1)
     monkeypatch.setattr(ChapterArchiver, "_fetch_image", lambda self, url, headers: _png_bytes())
@@ -482,6 +520,34 @@ def test_valid_pdf_is_skipped_but_invalid_pdf_is_replaced(tmp_path, monkeypatch)
     assert second_result.status == "already_exists"
     assert second_result.expected_pages == second_result.saved_pages == 1
     assert fetch_calls == ["https://example.com/0.png"]
+
+
+def test_force_replaces_a_valid_pdf_and_preserves_it_on_a_later_failure(tmp_path, monkeypatch):
+    fetch_results = [_png_bytes(), _transparent_png_bytes(), None]
+    fetch_calls = []
+
+    def fetch_image(self, url, headers):
+        fetch_calls.append(url)
+        return fetch_results.pop(0)
+
+    monkeypatch.setattr(ChapterArchiver, "_fetch_image", fetch_image)
+    chapter = DummyChapter(1.0, [Page(0, "https://example.com/0.png")])
+    pdf_path = tmp_path / "pdf" / "1.pdf"
+
+    first_result = ChapterArchiver(str(tmp_path), max_workers=1).archive(chapter, pdf=True, headers=None)
+    first_pdf = pdf_path.read_bytes()
+    forced_result = ChapterArchiver(str(tmp_path), max_workers=1, force=True).archive(chapter, pdf=True, headers=None)
+    forced_pdf = pdf_path.read_bytes()
+    failed_result = ChapterArchiver(str(tmp_path), max_workers=1, retry_enabled=False, force=True).archive(
+        chapter, pdf=True, headers=None
+    )
+
+    assert first_result.status == "downloaded"
+    assert forced_result.status == "downloaded"
+    assert forced_pdf != first_pdf
+    assert failed_result.status == "failed"
+    assert pdf_path.read_bytes() == forced_pdf
+    assert fetch_calls == ["https://example.com/0.png"] * 3
 
 
 def test_chapter_lock_serializes_duplicate_archives(tmp_path, monkeypatch):

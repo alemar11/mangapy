@@ -19,7 +19,7 @@ except importlib.metadata.PackageNotFoundError:
     version = "0.0.0"
 default_path_to_download_folder = str(os.path.join(Path.home(), "Downloads", "mangapy"))
 
-_GLOBAL_YAML_KEYS = {"debug", "downloads", "no_progress", "no_retry", "output", "proxy"}
+_GLOBAL_YAML_KEYS = {"debug", "downloads", "force", "no_progress", "no_retry", "output", "proxy"}
 _DOWNLOAD_YAML_KEYS = {
     "content_rating",
     "data_saver",
@@ -28,6 +28,7 @@ _DOWNLOAD_YAML_KEYS = {
     "download_chapters",
     "download_last_chapter",
     "download_single_chapter",
+    "force",
     "no_progress",
     "no_retry",
     "output",
@@ -56,6 +57,7 @@ def cmd_parse():
     args_parser.add_argument("-o", "--out", type=str, default=default_path_to_download_folder, help="download directory")
     args_parser.add_argument("-d", "--debug", action="store_true", help="set log to DEBUG level")
     args_parser.add_argument("--pdf", action="store_true", help="create a pdf for each chapter")
+    args_parser.add_argument("--force", action="store_true", help="redownload and replace existing chapter files")
     args_parser.add_argument("--no-retry", action="store_true", help="disable network retries")
     args_parser.add_argument("--no-progress", action="store_true", help="disable progress output")
 
@@ -101,6 +103,7 @@ def main_yaml(args: argparse.Namespace) -> int:
         output = _text_value(dictionary.get("output", default_path_to_download_folder), "output")
         proxy = _proxy_value(dictionary.get("proxy"), "proxy")
         debug_log = _bool_value(dictionary, "debug", False)
+        force = _bool_value(dictionary, "force", False)
         no_retry = _bool_value(dictionary, "no_retry", False)
         no_progress = _bool_value(dictionary, "no_progress", False)
         downloads = _normalize_yaml_downloads(dictionary)
@@ -121,6 +124,7 @@ def main_yaml(args: argparse.Namespace) -> int:
                 default_output=output,
                 default_proxy=proxy,
                 default_debug=debug_log,
+                default_force=force,
                 default_no_retry=no_retry,
                 default_no_progress=no_progress,
             )
@@ -166,6 +170,7 @@ def main_title(args: argparse.Namespace) -> int:
         source=source,
         output=output,
         pdf=bool(args.pdf),
+        force=bool(getattr(args, "force", False)),
         proxy=proxy,
         no_retry=bool(getattr(args, "no_retry", False)),
         no_progress=bool(getattr(args, "no_progress", False)),
@@ -287,6 +292,7 @@ def _download_request_from_yaml(
     default_output: str,
     default_proxy: dict | None,
     default_debug: bool,
+    default_force: bool,
     default_no_retry: bool,
     default_no_progress: bool,
 ) -> DownloadRequest:
@@ -313,6 +319,7 @@ def _download_request_from_yaml(
         source=source,
         output=output,
         pdf=_bool_value(entry, "pdf", False),
+        force=_bool_value(entry, "force", default_force),
         proxy=proxy,
         no_retry=_bool_value(entry, "no_retry", default_no_retry),
         no_progress=_bool_value(entry, "no_progress", default_no_progress),
