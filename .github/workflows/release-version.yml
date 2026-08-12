@@ -122,7 +122,7 @@ jobs:
     if: ${{ needs.plan.outputs.status == 'proposal-ready' }}
     runs-on: ubuntu-latest
     environment:
-      name: release-approval
+      name: release-tag-approval
       deployment: false
     permissions: {}
     steps:

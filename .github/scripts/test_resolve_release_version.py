@@ -188,7 +188,7 @@ class ReleaseResolverAssetTests(unittest.TestCase):
         workflow = RELEASE_VERSION_WORKFLOW.read_text(encoding="utf-8")
         self.assertIn("name: Approve proposed tag ${{ needs.plan.outputs.tag }}", workflow)
         self.assertIn("needs.plan.outputs.status == 'proposal-ready'", workflow)
-        self.assertIn("name: release-approval", workflow)
+        self.assertIn("name: release-tag-approval", workflow)
         self.assertIn("deployment: false", workflow)
         self.assertIn("needs: [plan, approval]", workflow)
         self.assertIn("CONFIRMED_TAG: ${{ needs.plan.outputs.tag }}", workflow)
