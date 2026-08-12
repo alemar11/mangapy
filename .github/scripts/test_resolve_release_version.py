@@ -9,9 +9,7 @@ from types import ModuleType
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 ASSET = Path(__file__).resolve().parent / "resolve_release_version.py"
-DRY_RUN_WORKFLOW = PROJECT_ROOT / "workflows" / "release-version-dry-run.yml"
-APPLY_WORKFLOW = PROJECT_ROOT / "workflows" / "release-version-apply.yml"
-APPROVAL_TEST_WORKFLOW = PROJECT_ROOT / "workflows" / "release-version-approval-test.yml"
+RELEASE_VERSION_WORKFLOW = PROJECT_ROOT / "workflows" / "release-version.yml"
 RELEASE_WORKFLOW = PROJECT_ROOT / "workflows" / "release.yml"
 
 
@@ -54,8 +52,8 @@ class ReleaseResolverAssetTests(unittest.TestCase):
             capture_output=True,
             text=True,
         )
-        self.assertEqual(self.resolver.RESOLVER_VERSION, "0.2.0")
-        self.assertEqual(completed.stdout.strip(), "0.2.0")
+        self.assertEqual(self.resolver.RESOLVER_VERSION, "0.2.1")
+        self.assertEqual(completed.stdout.strip(), "0.2.1")
         self.assertEqual(completed.stderr, "")
 
     def test_final_tag_classification_requires_canonical_stable_form(self) -> None:
@@ -151,22 +149,24 @@ class ReleaseResolverAssetTests(unittest.TestCase):
 
     def test_direct_publish_dispatch_requires_an_existing_final_tag(self) -> None:
         release = RELEASE_WORKFLOW.read_text(encoding="utf-8")
-        apply = APPLY_WORKFLOW.read_text(encoding="utf-8")
+        release_version = RELEASE_VERSION_WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn("workflow_call:", release)
         self.assertIn("workflow_dispatch:", release)
-        self.assertIn("description: Exact existing final tag to publish", release)
-        self.assertIn("confirmed_tag: ${{ inputs.tag || github.ref_name }}", release)
+        self.assertNotIn("push:\n    tags:", release)
+        self.assertIn("description: Exact existing final tag to recover", release)
+        self.assertIn("EXPECTED_SOURCE_SHA: ${{ inputs.source_sha }}", release)
+        self.assertIn("CONFIRMED_TAG: ${{ steps.tag.outputs.tag }}", release)
+        self.assertIn('--confirmed-tag "$CONFIRMED_TAG"', release)
         self.assertIn("ref: ${{ needs.resolve.outputs.tag }}", release)
         self.assertIn("needs.resolve.outputs.tag_state == 'existing-final'", release)
-        self.assertIn("gh workflow run release.yml", apply)
-        self.assertIn('--repo "$GITHUB_REPOSITORY"', apply)
-        self.assertIn('--field tag="$TAG"', apply)
+        self.assertIn("uses: ./.github/workflows/release.yml", release_version)
+        self.assertIn("tag: ${{ needs.resolve.outputs.tag }}", release_version)
+        self.assertIn("source_sha: ${{ needs.final.outputs.source_sha }}", release_version)
+        self.assertNotIn("gh workflow run release.yml", release_version)
 
-    def test_apply_and_approval_ui_match_dry_run_operation_choices(self) -> None:
-        dry_run = DRY_RUN_WORKFLOW.read_text(encoding="utf-8")
-        apply = APPLY_WORKFLOW.read_text(encoding="utf-8")
-        approval = APPROVAL_TEST_WORKFLOW.read_text(encoding="utf-8")
-        apply_dispatch = apply.split("\npermissions: {}", 1)[0]
-        approval_dispatch = approval.split("\npermissions: {}", 1)[0]
+    def test_single_release_version_ui_contains_all_operation_choices(self) -> None:
+        workflow = RELEASE_VERSION_WORKFLOW.read_text(encoding="utf-8")
+        dispatch = workflow.split("\npermissions: {}", 1)[0]
         for option in (
             '"[patch] Default branch → vX.Y.(Z+1)-rc.1"',
             '"[minor] Default branch → vX.(Y+1).0-rc.1"',
@@ -174,24 +174,27 @@ class ReleaseResolverAssetTests(unittest.TestCase):
             '"[candidate] release/vX.Y.Z → vX.Y.Z-rc.N"',
             '"[final] release/vX.Y.Z → vX.Y.Z"',
         ):
-            self.assertIn(option, dry_run)
-            self.assertIn(option, apply_dispatch)
-            self.assertIn(option, approval_dispatch)
-        self.assertNotIn("confirmed_tag", apply_dispatch)
-        self.assertIn("needs: plan", apply)
-        self.assertIn("application_mode: false", apply)
-        self.assertIn("confirmed_tag: ${{ needs.plan.outputs.tag }}", apply)
+            self.assertIn(option, dispatch)
+        self.assertNotIn("confirmed_tag", dispatch)
 
-    def test_approval_workflow_exposes_the_tag_without_mutating_refs(self) -> None:
-        workflow = APPROVAL_TEST_WORKFLOW.read_text(encoding="utf-8")
+    def test_obsolete_release_version_workflows_are_removed(self) -> None:
+        workflows = RELEASE_VERSION_WORKFLOW.parent
+        self.assertFalse((workflows / "release-version-dry-run.yml").exists())
+        self.assertFalse((workflows / "release-version-apply.yml").exists())
+        self.assertFalse((workflows / "release-version-approval-test.yml").exists())
+
+    def test_approval_gates_revalidation_and_mutation(self) -> None:
+        workflow = RELEASE_VERSION_WORKFLOW.read_text(encoding="utf-8")
         self.assertIn("name: Approve proposed tag ${{ needs.plan.outputs.tag }}", workflow)
         self.assertIn("needs.plan.outputs.status == 'proposal-ready'", workflow)
-        self.assertIn("name: release-approval-test", workflow)
+        self.assertIn("name: release-approval", workflow)
         self.assertIn("deployment: false", workflow)
-        self.assertIn("No tag, branch, release, pull request", workflow)
-        self.assertNotIn("contents: write", workflow)
-        self.assertNotIn("--method POST", workflow)
-        self.assertNotIn("git push", workflow)
+        self.assertIn("needs: [plan, approval]", workflow)
+        self.assertIn("CONFIRMED_TAG: ${{ needs.plan.outputs.tag }}", workflow)
+        self.assertIn("--application-mode", workflow)
+        self.assertIn("Remote state will be revalidated before any tag", workflow)
+        self.assertIn("contents: write", workflow)
+        self.assertIn("--method POST", workflow)
 
     def test_asset_has_no_project_or_network_dependency(self) -> None:
         source = ASSET.read_text(encoding="utf-8")
@@ -200,21 +203,24 @@ class ReleaseResolverAssetTests(unittest.TestCase):
         self.assertNotIn("urllib", source)
         self.assertNotIn("requests", source)
 
-    def test_reference_embeds_both_complete_workflow_templates(self) -> None:
-        dry_run = DRY_RUN_WORKFLOW.read_text(encoding="utf-8")
-        apply = APPLY_WORKFLOW.read_text(encoding="utf-8")
-        self.assertIn("name: Release version (dry run)", dry_run)
-        self.assertIn("name: Release version (apply)", apply)
-        self.assertIn("resolver API 0.2.0", dry_run)
+    def test_release_version_workflow_preserves_resolver_and_safety_contract(self) -> None:
+        workflow = RELEASE_VERSION_WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn("name: Release version", workflow)
+        self.assertIn("resolver API 0.2.1", workflow)
         self.assertIn(
             "actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
-            dry_run,
+            workflow,
         )
-        self.assertIn('EXPECTED_RESOLVER_VERSION: "0.2.0"', dry_run)
-        self.assertIn("is_final: ${{ steps.resolve.outputs.is_final }}", dry_run)
-        self.assertIn("needs.resolve.outputs.is_final == 'true'", apply)
-        self.assertIn("pull-requests: write", apply)
-        self.assertIn("No application source or package metadata", apply)
+        self.assertIn('EXPECTED_RESOLVER_VERSION: "0.2.1"', workflow)
+        self.assertIn("is_final: ${{ steps.resolve.outputs.is_final }}", workflow)
+        self.assertIn("needs.resolve.outputs.is_final == 'true'", workflow)
+        self.assertIn("pull-requests: write", workflow)
+        self.assertIn("No application source or package metadata", workflow)
+
+    def test_plan_summary_points_to_the_approval_gate(self) -> None:
+        source = ASSET.read_text(encoding="utf-8")
+        self.assertIn("approve it through the protected environment", source)
+        self.assertNotIn("Release version (apply)", source)
 
 
 if __name__ == "__main__":

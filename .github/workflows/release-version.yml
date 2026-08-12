@@ -1,7 +1,7 @@
-# g:versioning release workflow template; resolver API 0.2.0
-name: Release version (apply)
+# Approval-gated g:versioning workflow; resolver API 0.2.1
+name: Release version
 
-run-name: Apply · ${{ inputs.operation }} · ${{ github.ref_name }}
+run-name: Request · ${{ inputs.operation }} · ${{ github.ref_name }}
 
 on:
   workflow_dispatch:
@@ -20,33 +20,231 @@ on:
 permissions: {}
 
 concurrency:
-  group: release-version-apply-${{ github.repository }}
+  group: release-version-${{ github.repository }}
   cancel-in-progress: false
 
 jobs:
   plan:
     name: Resolve requested operation
-    uses: ./.github/workflows/release-version-dry-run.yml
-    with:
-      application_mode: false
-      operation: ${{ inputs.operation }}
-      ref_name: ${{ github.ref_name }}
-      target_sha: ${{ github.sha }}
+    runs-on: ubuntu-latest
     permissions:
       contents: read
+    outputs:
+      context: ${{ steps.resolve.outputs.context }}
+      default_branch: ${{ steps.resolve.outputs.default_branch }}
+      is_final: ${{ steps.resolve.outputs.is_final }}
+      kind: ${{ steps.resolve.outputs.kind }}
+      release_branch: ${{ steps.resolve.outputs.release_branch }}
+      status: ${{ steps.resolve.outputs.status }}
+      tag: ${{ steps.resolve.outputs.tag }}
+      tag_snapshot: ${{ steps.resolve.outputs.tag_snapshot }}
+    steps:
+      - name: Capture repository version state
+        id: snapshot
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tags_file="$RUNNER_TEMP/release-tags.txt"
+          gh api --paginate \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "repos/${GITHUB_REPOSITORY}/git/matching-refs/tags/" \
+            --jq '.[].ref | sub("^refs/tags/"; "")' \
+            | LC_ALL=C sort -u > "$tags_file"
+
+          default_branch="$(gh api "repos/${GITHUB_REPOSITORY}" --jq .default_branch)"
+          default_ref="refs/heads/${default_branch}"
+          default_sha="$(
+            gh api "repos/${GITHUB_REPOSITORY}/git/matching-refs/heads/${default_branch}" \
+              | jq -r --arg default_ref "$default_ref" \
+                '[.[] | select(.ref == $default_ref) | .object.sha][0] // empty'
+          )"
+          if [[ -z "$default_sha" ]]; then
+            echo "Could not resolve the current default-branch commit." >&2
+            exit 1
+          fi
+
+          tag_snapshot="$(sha256sum "$tags_file" | cut -d ' ' -f 1)"
+          {
+            echo "default_branch=$default_branch"
+            echo "default_sha=$default_sha"
+            echo "tag_snapshot=$tag_snapshot"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Check out only the trusted version resolver
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ steps.snapshot.outputs.default_sha }}
+          sparse-checkout: .github/scripts/resolve_release_version.py
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Verify release resolver API version
+        env:
+          EXPECTED_RESOLVER_VERSION: "0.2.1"
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual_version="$(python3 .github/scripts/resolve_release_version.py --version)"
+          if [[ "$actual_version" != "$EXPECTED_RESOLVER_VERSION" ]]; then
+            echo "Resolver version $actual_version does not match workflow API $EXPECTED_RESOLVER_VERSION." >&2
+            exit 1
+          fi
+
+      - name: Calculate exact tag proposal
+        id: resolve
+        env:
+          DEFAULT_BRANCH: ${{ steps.snapshot.outputs.default_branch }}
+          OPERATION: ${{ inputs.operation }}
+          REF_NAME: ${{ github.ref_name }}
+          TAG_SNAPSHOT: ${{ steps.snapshot.outputs.tag_snapshot }}
+          TARGET_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/resolve_release_version.py \
+            --default-branch "$DEFAULT_BRANCH" \
+            --github-output "$GITHUB_OUTPUT" \
+            --github-step-summary "$GITHUB_STEP_SUMMARY" \
+            --operation "$OPERATION" \
+            --ref-name "$REF_NAME" \
+            --tag-snapshot "$TAG_SNAPSHOT" \
+            --tags-file "$RUNNER_TEMP/release-tags.txt" \
+            --target-sha "$TARGET_SHA"
+
+  approval:
+    name: Approve proposed tag ${{ needs.plan.outputs.tag }}
+    needs: plan
+    if: ${{ needs.plan.outputs.status == 'proposal-ready' }}
+    runs-on: ubuntu-latest
+    environment:
+      name: release-approval
+      deployment: false
+    permissions: {}
+    steps:
+      - name: Record approved proposal
+        env:
+          CONTEXT: ${{ needs.plan.outputs.context }}
+          KIND: ${{ needs.plan.outputs.kind }}
+          RELEASE_BRANCH: ${{ needs.plan.outputs.release_branch }}
+          TAG: ${{ needs.plan.outputs.tag }}
+          TARGET_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "## Release proposal approved"
+            echo
+            echo "- Tag: \`$TAG\`"
+            echo "- Kind: \`$KIND\`"
+            echo "- Context: \`$CONTEXT\`"
+            echo "- Release branch: \`$RELEASE_BRANCH\`"
+            echo "- Target commit: \`$TARGET_SHA\`"
+            echo
+            echo "Remote state will be revalidated before any tag or branch is created."
+          } >> "$GITHUB_STEP_SUMMARY"
 
   resolve:
     name: Revalidate calculated tag
-    needs: plan
-    uses: ./.github/workflows/release-version-dry-run.yml
-    with:
-      application_mode: true
-      operation: ${{ inputs.operation }}
-      confirmed_tag: ${{ needs.plan.outputs.tag }}
-      ref_name: ${{ github.ref_name }}
-      target_sha: ${{ github.sha }}
+    needs: [plan, approval]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
+    outputs:
+      application_ready: ${{ steps.resolve.outputs.application_ready }}
+      context: ${{ steps.resolve.outputs.context }}
+      default_branch: ${{ steps.resolve.outputs.default_branch }}
+      is_final: ${{ steps.resolve.outputs.is_final }}
+      kind: ${{ steps.resolve.outputs.kind }}
+      release_branch: ${{ steps.resolve.outputs.release_branch }}
+      status: ${{ steps.resolve.outputs.status }}
+      tag: ${{ steps.resolve.outputs.tag }}
+      tag_snapshot: ${{ steps.resolve.outputs.tag_snapshot }}
+      tag_state: ${{ steps.resolve.outputs.tag_state }}
+    steps:
+      - name: Refresh repository version state after approval
+        id: snapshot
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tags_file="$RUNNER_TEMP/release-tags.txt"
+          gh api --paginate \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "repos/${GITHUB_REPOSITORY}/git/matching-refs/tags/" \
+            --jq '.[].ref | sub("^refs/tags/"; "")' \
+            | LC_ALL=C sort -u > "$tags_file"
+
+          default_branch="$(gh api "repos/${GITHUB_REPOSITORY}" --jq .default_branch)"
+          default_ref="refs/heads/${default_branch}"
+          default_sha="$(
+            gh api "repos/${GITHUB_REPOSITORY}/git/matching-refs/heads/${default_branch}" \
+              | jq -r --arg default_ref "$default_ref" \
+                '[.[] | select(.ref == $default_ref) | .object.sha][0] // empty'
+          )"
+          if [[ -z "$default_sha" ]]; then
+            echo "Could not resolve the current default-branch commit." >&2
+            exit 1
+          fi
+
+          tag_snapshot="$(sha256sum "$tags_file" | cut -d ' ' -f 1)"
+          {
+            echo "default_branch=$default_branch"
+            echo "default_sha=$default_sha"
+            echo "tag_snapshot=$tag_snapshot"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Check out only the trusted version resolver
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ steps.snapshot.outputs.default_sha }}
+          sparse-checkout: .github/scripts/resolve_release_version.py
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Verify release resolver API version
+        env:
+          EXPECTED_RESOLVER_VERSION: "0.2.1"
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual_version="$(python3 .github/scripts/resolve_release_version.py --version)"
+          if [[ "$actual_version" != "$EXPECTED_RESOLVER_VERSION" ]]; then
+            echo "Resolver version $actual_version does not match workflow API $EXPECTED_RESOLVER_VERSION." >&2
+            exit 1
+          fi
+
+      - name: Revalidate approved tag
+        id: resolve
+        env:
+          CONFIRMED_TAG: ${{ needs.plan.outputs.tag }}
+          DEFAULT_BRANCH: ${{ steps.snapshot.outputs.default_branch }}
+          OPERATION: ${{ inputs.operation }}
+          REF_NAME: ${{ github.ref_name }}
+          TAG_SNAPSHOT: ${{ steps.snapshot.outputs.tag_snapshot }}
+          TARGET_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/resolve_release_version.py \
+            --application-mode \
+            --confirmed-tag "$CONFIRMED_TAG" \
+            --default-branch "$DEFAULT_BRANCH" \
+            --github-output "$GITHUB_OUTPUT" \
+            --github-step-summary "$GITHUB_STEP_SUMMARY" \
+            --operation "$OPERATION" \
+            --ref-name "$REF_NAME" \
+            --tag-snapshot "$TAG_SNAPSHOT" \
+            --tags-file "$RUNNER_TEMP/release-tags.txt" \
+            --target-sha "$TARGET_SHA"
 
   candidate:
     name: Create candidate tag and release branch
@@ -80,7 +278,7 @@ jobs:
             | LC_ALL=C sort -u > "$tags_file"
           current_tag_snapshot="$(sha256sum "$tags_file" | cut -d ' ' -f 1)"
           if [[ "$current_tag_snapshot" != "$EXPECTED_TAG_SNAPSHOT" ]]; then
-            echo "The tag set changed after resolution; run the dry run and Release version (apply) again." >&2
+            echo "The tag set changed after approval; request the release version again." >&2
             exit 1
           fi
 
@@ -97,7 +295,7 @@ jobs:
 
           current_default_branch="$(gh api "repos/${GITHUB_REPOSITORY}" --jq .default_branch)"
           if [[ "$current_default_branch" != "$DEFAULT_BRANCH" ]]; then
-            echo "The default branch changed after resolution; run the dry run and Release version (apply) again." >&2
+            echo "The default branch changed after approval; request the release version again." >&2
             exit 1
           fi
 
@@ -190,10 +388,12 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      actions: write
       pull-requests: write
+    outputs:
+      source_sha: ${{ steps.final-tag.outputs.source_sha }}
     steps:
       - name: Revalidate and create immutable final tag
+        id: final-tag
         env:
           DEFAULT_BRANCH: ${{ needs.resolve.outputs.default_branch }}
           EXPECTED_TAG_SNAPSHOT: ${{ needs.resolve.outputs.tag_snapshot }}
@@ -214,7 +414,7 @@ jobs:
             | LC_ALL=C sort -u > "$tags_file"
           current_tag_snapshot="$(sha256sum "$tags_file" | cut -d ' ' -f 1)"
           if [[ "$current_tag_snapshot" != "$EXPECTED_TAG_SNAPSHOT" ]]; then
-            echo "The tag set changed after resolution; run the dry run and Release version (apply) again." >&2
+            echo "The tag set changed after approval; request the release version again." >&2
             exit 1
           fi
 
@@ -235,7 +435,7 @@ jobs:
 
           current_default_branch="$(gh api "repos/${GITHUB_REPOSITORY}" --jq .default_branch)"
           if [[ "$current_default_branch" != "$DEFAULT_BRANCH" ]]; then
-            echo "The default branch changed after resolution; run the dry run and Release version (apply) again." >&2
+            echo "The default branch changed after approval; request the release version again." >&2
             exit 1
           fi
 
@@ -301,24 +501,7 @@ jobs:
             echo "$TAG does not resolve to the selected SHA; refusing to move it." >&2
             exit 1
           fi
-
-      - name: Dispatch stable publish workflow
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ needs.resolve.outputs.tag }}
-          TAG_STATE: ${{ needs.resolve.outputs.tag_state }}
-        if: ${{ needs.resolve.outputs.tag_state == 'absent' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [[ "$TAG_STATE" != "absent" ]]; then
-            echo "The stable tag already existed; publish dispatch is not repeated."
-            exit 0
-          fi
-          gh workflow run release.yml \
-            --repo "$GITHUB_REPOSITORY" \
-            --ref "$TAG" \
-            --field tag="$TAG"
+          echo "source_sha=$target_sha" >> "$GITHUB_OUTPUT"
 
       - name: Create a PR to the default branch only when differences exist
         env:
@@ -396,3 +579,16 @@ jobs:
             echo
             echo "No application source or package metadata was read, edited, or committed."
           } >> "$GITHUB_STEP_SUMMARY"
+
+  publish:
+    name: Publish approved final tag
+    if: ${{ needs.resolve.outputs.tag_state == 'absent' }}
+    needs: [resolve, final]
+    uses: ./.github/workflows/release.yml
+    with:
+      tag: ${{ needs.resolve.outputs.tag }}
+      source_sha: ${{ needs.final.outputs.source_sha }}
+    permissions:
+      contents: read
+      id-token: write
+    secrets: inherit
