@@ -156,6 +156,7 @@ class ChapterArchiver:
         show_progress: bool = True,
         proxies: Mapping[str, str] | None = None,
         progress: terminal.DownloadProgress | None = None,
+        force: bool = False,
     ):
         output_path = Path(path).expanduser()
         output_path.mkdir(parents=True, exist_ok=True)
@@ -168,6 +169,7 @@ class ChapterArchiver:
 
         self.max_workers = max_workers
         self.retry_enabled = retry_enabled
+        self.force = force
         self.show_progress = show_progress
         self.progress = progress if progress is not None else terminal.DownloadProgress(enabled=show_progress)
         self.proxies = dict(proxies or {})
@@ -241,7 +243,7 @@ class ChapterArchiver:
                         )
                     preloaded_pages = fetched_pages
                     existing_pdf_is_complete = len(fetched_pages) == existing_pdf_pages and len(fetched_pages) > 0
-            if existing_pdf_is_complete:
+            if existing_pdf_is_complete and not self.force:
                 message = f"Chapter {chapter_name} is already downloaded and will be skipped."
                 terminal.muted(message)
                 return ArchiveResult(
@@ -395,7 +397,7 @@ class ChapterArchiver:
         try:
             image_url = page.url
             file_path = self._safe_file_target(image_path, _page_target_name(page))
-            if self._is_valid_image(file_path):
+            if not self.force and self._is_valid_image(file_path):
                 return _PageResult("already_exists", file_path)
 
             if image_url.startswith("//"):

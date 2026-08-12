@@ -33,6 +33,7 @@ class DownloadRequest:
     download_single_chapter: str | None = None
     download_chapters: str | None = None
     options: dict | None = None
+    force: bool = False
 
 
 @dataclass(frozen=True)
@@ -102,6 +103,7 @@ class DownloadManager:
                     str(directory),
                     max_workers=capabilities.max_parallel_pages,
                     retry_enabled=not request.no_retry,
+                    force=request.force,
                     proxies=request.proxy,
                     progress=progress,
                 )

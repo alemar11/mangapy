@@ -43,7 +43,8 @@
         "--source",
         "fanfox",
         "--chapter",
-        "1"
+        "1",
+        "--force"
       ],
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal"
