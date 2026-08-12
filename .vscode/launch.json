@@ -39,9 +39,9 @@
       "module": "mangapy.cli",
       "args": [
         "title",
-        "One Piece",
+        "Bleach",
         "--source",
-        "mangadex",
+        "fanfox",
         "--chapter",
         "1",
         "--no-progress"
