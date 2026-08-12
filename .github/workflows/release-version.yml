@@ -1,7 +1,7 @@
-# Approval-gated g:versioning workflow; resolver API 0.2.1
-name: Release version
+# Approval-gated g:versioning workflow; resolver API 0.2.2
+name: Create release tag
 
-run-name: Request · ${{ inputs.operation }} · ${{ github.ref_name }}
+run-name: Request tag · ${{ inputs.operation }} · ${{ github.ref_name }}
 
 on:
   workflow_dispatch:
@@ -85,7 +85,7 @@ jobs:
 
       - name: Verify release resolver API version
         env:
-          EXPECTED_RESOLVER_VERSION: "0.2.1"
+          EXPECTED_RESOLVER_VERSION: "0.2.2"
         shell: bash
         run: |
           set -euo pipefail
@@ -212,7 +212,7 @@ jobs:
 
       - name: Verify release resolver API version
         env:
-          EXPECTED_RESOLVER_VERSION: "0.2.1"
+          EXPECTED_RESOLVER_VERSION: "0.2.2"
         shell: bash
         run: |
           set -euo pipefail

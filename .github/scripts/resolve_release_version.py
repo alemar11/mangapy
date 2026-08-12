@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Iterable, Sequence
 
 
-RESOLVER_VERSION = "0.2.1"
+RESOLVER_VERSION = "0.2.2"
 TAG_PATTERN = re.compile(
     r"^(?P<prefix>v?)(?P<major>0|[1-9][0-9]*)\."
     r"(?P<minor>0|[1-9][0-9]*)\."
@@ -524,8 +524,8 @@ def write_summary(
         lines.extend(
             [
                 "",
-                "Run **Release version** from the same ref, review the exact resolved "
-                "tag, and approve it through the protected environment.",
+                "Review the exact resolved tag above and approve it through the "
+                "protected environment.",
             ]
         )
     elif result["tag_state"] == "existing-final":

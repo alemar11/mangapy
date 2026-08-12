@@ -52,8 +52,8 @@ class ReleaseResolverAssetTests(unittest.TestCase):
             capture_output=True,
             text=True,
         )
-        self.assertEqual(self.resolver.RESOLVER_VERSION, "0.2.1")
-        self.assertEqual(completed.stdout.strip(), "0.2.1")
+        self.assertEqual(self.resolver.RESOLVER_VERSION, "0.2.2")
+        self.assertEqual(completed.stdout.strip(), "0.2.2")
         self.assertEqual(completed.stderr, "")
 
     def test_final_tag_classification_requires_canonical_stable_form(self) -> None:
@@ -152,6 +152,7 @@ class ReleaseResolverAssetTests(unittest.TestCase):
         release_version = RELEASE_VERSION_WORKFLOW.read_text(encoding="utf-8")
         self.assertIn("workflow_call:", release)
         self.assertIn("workflow_dispatch:", release)
+        self.assertIn("name: Publish tagged release", release)
         self.assertNotIn("push:\n    tags:", release)
         self.assertIn("description: Exact existing final tag to recover", release)
         self.assertIn("EXPECTED_SOURCE_SHA: ${{ inputs.source_sha }}", release)
@@ -205,13 +206,13 @@ class ReleaseResolverAssetTests(unittest.TestCase):
 
     def test_release_version_workflow_preserves_resolver_and_safety_contract(self) -> None:
         workflow = RELEASE_VERSION_WORKFLOW.read_text(encoding="utf-8")
-        self.assertIn("name: Release version", workflow)
-        self.assertIn("resolver API 0.2.1", workflow)
+        self.assertIn("name: Create release tag", workflow)
+        self.assertIn("resolver API 0.2.2", workflow)
         self.assertIn(
             "actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
             workflow,
         )
-        self.assertIn('EXPECTED_RESOLVER_VERSION: "0.2.1"', workflow)
+        self.assertIn('EXPECTED_RESOLVER_VERSION: "0.2.2"', workflow)
         self.assertIn("is_final: ${{ steps.resolve.outputs.is_final }}", workflow)
         self.assertIn("needs.resolve.outputs.is_final == 'true'", workflow)
         self.assertIn("pull-requests: write", workflow)
@@ -219,8 +220,8 @@ class ReleaseResolverAssetTests(unittest.TestCase):
 
     def test_plan_summary_points_to_the_approval_gate(self) -> None:
         source = ASSET.read_text(encoding="utf-8")
-        self.assertIn("approve it through the protected environment", source)
-        self.assertNotIn("Release version (apply)", source)
+        self.assertIn("Review the exact resolved tag above", source)
+        self.assertNotIn("Run **Release version", source)
 
 
 if __name__ == "__main__":

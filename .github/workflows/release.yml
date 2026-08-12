@@ -1,6 +1,6 @@
-name: Release
+name: Publish tagged release
 
-run-name: Publish ${{ inputs.tag }}
+run-name: Publish · ${{ inputs.tag }}
 
 on:
   workflow_call:
@@ -129,7 +129,7 @@ jobs:
 
       - name: Verify release resolver API version
         env:
-          EXPECTED_RESOLVER_VERSION: "0.2.1"
+          EXPECTED_RESOLVER_VERSION: "0.2.2"
         shell: bash
         run: |
           set -euo pipefail
