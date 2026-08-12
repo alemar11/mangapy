@@ -9,7 +9,7 @@
 [![Build](https://github.com/alemar11/mangapy/actions/workflows/pythonpackage.yml/badge.svg)](https://github.com/alemar11/mangapy/actions/workflows/pythonpackage.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-[Getting started](#getting-started) · [CLI examples](#cli-examples) · [YAML mode](#yaml-mode) · [Configuration](#configuration)
+[Getting started](#getting-started) · [CLI examples](#cli-examples) · [YAML mode](#yaml-mode) · [Configuration](#configuration) · [Development setup](#development-setup)
 
 </div>
 
@@ -269,20 +269,38 @@ local pages match the provider response.
 | `2` | The command line or input was rejected by the argument parser. |
 | `130` | The download was interrupted by the user. |
 
-## Development
+## Development setup
 
-Clone the repository and use [`uv`](https://docs.astral.sh/uv/) to run the
-offline test suite:
+Install [`mise`](https://mise.jdx.dev/) and clone the repository:
 
 ```console
 git clone https://github.com/alemar11/mangapy.git
 cd mangapy
-uv sync
-uv run pytest -q
+mise install
+mise run setup
 ```
 
-Live provider tests are excluded by default because they contact third-party
-services and may be affected by site changes or rate limits.
+`mise install` provides the required Python 3.14 and [`uv`](https://docs.astral.sh/uv/).
+`mise run setup` creates the project-local `.venv` and installs the application
+and development dependencies.
+
+Verify the checkout:
+
+```console
+mise run lint
+mise run test
+uv run mangapy --help
+```
+
+The default test command excludes live provider tests because they contact
+third-party services and may be affected by site changes or rate limits.
+
+When opening the repository in VS Code, accept the recommended Python, Python
+Environments, Python Debugger, and Ruff extensions. Select `.venv` as the Python
+interpreter if VS Code does not detect it automatically.
+
+See [Development](docs/Development.md) for the complete editor workflow and
+[Tests](docs/Tests.md) for live-provider and targeted test commands.
 
 ## License
 
