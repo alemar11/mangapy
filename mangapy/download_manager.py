@@ -75,59 +75,68 @@ class DownloadManager:
             repository.no_retry = request.no_retry
 
         log.debug("download request source=%s title=%r options=%r", request.source, request.title, request.options)
-        terminal.info(f"Searching for {request.title} in {request.source}...", icon="⌕")
-        manga = _search_manga(repository, request)
-        if manga is None:
-            return DownloadResult(error=f"Unable to find a downloadable manga for {request.title}")
-
-        terminal.success(f"Found {manga.title}.")
-
-        chapters = _select_chapters(manga, request)
-        if not chapters:
-            message = "Chapter selection is empty"
-            log.error("%s.", message)
-            return DownloadResult(error=message)
-        try:
-            headers = repository.image_request_headers()
-            capabilities = repository.capabilities
-            _validate_capabilities(capabilities)
-            manga_subdirectory = _select_manga_subdirectory(request.output, request.source, manga)
-            directory = ensure_real_subdirectory(request.output, request.source, manga_subdirectory)
-            progress = terminal.DownloadProgress(enabled=not request.no_progress)
-            archiver = ChapterArchiver(
-                str(directory),
-                max_workers=capabilities.max_parallel_pages,
-                retry_enabled=not request.no_retry,
-                proxies=request.proxy,
-                progress=progress,
-            )
-        except Exception as exc:
-            message = f"Unable to initialize chapter downloads: {exc}"
-            _log_failure("%s", message)
-            return DownloadResult(selected_chapters=len(chapters), error=message)
-
-        terminal.info(f"Downloading {len(chapters)} chapter(s)...", icon="↓")
-        with progress, archiver.reuse_page_workers():
-            if capabilities.max_parallel_chapters > 1 and len(chapters) > 1:
-                with ThreadPoolExecutor(max_workers=capabilities.max_parallel_chapters) as executor:
-                    archive_results = list(
-                        executor.map(
-                            lambda chapter: _archive_with_archiver(archiver, chapter, request.pdf, headers),
-                            chapters,
-                        )
-                    )
+        progress = terminal.DownloadProgress(enabled=not request.no_progress)
+        with progress:
+            if progress.enabled:
+                progress.start_search(request.title, request.source)
             else:
-                archive_results = [_archive_with_archiver(archiver, chapter, request.pdf, headers) for chapter in chapters]
+                terminal.info(f"Searching for {request.title} in {request.source}...", icon="⌕")
 
-        result = _summarize_archive_results(archive_results)
+            manga = _search_manga(repository, request, progress)
+            if manga is None:
+                return DownloadResult(error=f"Unable to find a downloadable manga for {request.title}")
+
+            chapters = _select_chapters(manga, request)
+            if not chapters:
+                message = "Chapter selection is empty"
+                progress.clear_session()
+                log.error("%s.", message)
+                return DownloadResult(error=message)
+            try:
+                headers = repository.image_request_headers()
+                capabilities = repository.capabilities
+                _validate_capabilities(capabilities)
+                manga_subdirectory = _select_manga_subdirectory(request.output, request.source, manga)
+                directory = ensure_real_subdirectory(request.output, request.source, manga_subdirectory)
+                archiver = ChapterArchiver(
+                    str(directory),
+                    max_workers=capabilities.max_parallel_pages,
+                    retry_enabled=not request.no_retry,
+                    proxies=request.proxy,
+                    progress=progress,
+                )
+            except Exception as exc:
+                message = f"Unable to initialize chapter downloads: {exc}"
+                progress.clear_session()
+                _log_failure("%s", message)
+                return DownloadResult(selected_chapters=len(chapters), error=message)
+
+            if progress.enabled:
+                progress.start_download(manga.title, request.source, len(chapters))
+            else:
+                terminal.success(f"Found {manga.title}.")
+                terminal.info(f"Downloading {len(chapters)} chapter(s)...", icon="↓")
+
+            def archive_chapter(chapter: Chapter) -> ArchiveResult:
+                result = _archive_with_archiver(archiver, chapter, request.pdf, headers)
+                progress.advance_download()
+                return result
+
+            with archiver.reuse_page_workers():
+                if capabilities.max_parallel_chapters > 1 and len(chapters) > 1:
+                    with ThreadPoolExecutor(max_workers=capabilities.max_parallel_chapters) as executor:
+                        archive_results = list(executor.map(archive_chapter, chapters))
+                else:
+                    archive_results = [archive_chapter(chapter) for chapter in chapters]
+
+            result = _summarize_archive_results(archive_results)
+
+        provider = terminal.provider_label(request.source)
+        summary = _download_summary(result)
         if result.succeeded:
-            terminal.success(
-                f"Download finished: {result.downloaded_chapters} downloaded, {result.existing_chapters} already present."
-            )
+            terminal.success(f"{manga.title} · {provider} — {summary}.")
         else:
-            terminal.error(
-                f"Download completed with errors: {result.failed_chapters} failed, {result.unavailable_chapters} unavailable."
-            )
+            terminal.error(f"{manga.title} · {provider} — {summary}.")
         return result
 
 
@@ -172,14 +181,16 @@ def _summarize_archive_results(results: Iterable[ArchiveResult]) -> DownloadResu
     )
 
 
-def _search_manga(repository, request: DownloadRequest) -> Manga | None:
+def _search_manga(repository, request: DownloadRequest, progress: terminal.DownloadProgress) -> Manga | None:
     try:
         manga = repository.search(request.title, options=request.options)
     except Exception as exc:
+        progress.clear_session()
         _log_failure("Provider search failed: %s", exc)
         return None
 
     if manga is None:
+        progress.clear_session()
         terminal.error(f"Manga {request.title} doesn't exist.", to_stderr=False)
         _print_suggestions(repository, request.title, request.options)
         return None
@@ -188,6 +199,7 @@ def _search_manga(repository, request: DownloadRequest) -> Manga | None:
         return manga
 
     if request.source == "mangadex":
+        progress.clear_session()
         options = request.options or {}
         languages = _normalize_option_list(options.get("translated_language"), ["en"])
         ratings = _normalize_option_list(options.get("content_rating"), ["safe", "suggestive", "erotica"])
@@ -200,6 +212,7 @@ def _search_manga(repository, request: DownloadRequest) -> Manga | None:
         terminal.info(f"Try a different language via YAML (translated_language) or adjust content_rating: {rating_display}.")
         return None
 
+    progress.clear_session()
     terminal.error(f"Manga {request.title} has no chapters available.", to_stderr=False)
     return None
 
@@ -291,6 +304,21 @@ def _parse_number(value: object) -> float | None:
     except TypeError, ValueError:
         return None
     return number if math.isfinite(number) else None
+
+
+def _count(value: int, singular: str, status: str) -> str:
+    suffix = "" if value == 1 else "s"
+    return f"{value} {singular}{suffix} {status}"
+
+
+def _download_summary(result: DownloadResult) -> str:
+    counts = (
+        (result.downloaded_chapters, "downloaded"),
+        (result.existing_chapters, "already present"),
+        (result.failed_chapters, "failed"),
+        (result.unavailable_chapters, "unavailable"),
+    )
+    return ", ".join(_count(value, "chapter", status) for value, status in counts if value)
 
 
 def _configure_logging(debug: bool) -> None:

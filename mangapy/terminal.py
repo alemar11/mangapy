@@ -5,9 +5,18 @@ import threading
 from collections.abc import Iterable
 from typing import Literal
 
-from rich.console import Console
+from rich.console import Console, RenderableType
 from rich.logging import RichHandler
-from rich.progress import BarColumn, MofNCompleteColumn, Progress, SpinnerColumn, TaskID, TextColumn, TimeRemainingColumn
+from rich.progress import (
+    BarColumn,
+    MofNCompleteColumn,
+    Progress,
+    SpinnerColumn,
+    Task,
+    TaskID,
+    TextColumn,
+    TimeRemainingColumn,
+)
 from rich.table import Table
 from rich.text import Text
 from rich.theme import Theme
@@ -35,6 +44,32 @@ stdout = Console(theme=_THEME, markup=False, highlight=False)
 stderr = Console(theme=_THEME, markup=False, highlight=False, stderr=True)
 _managed_logging_handler: RichHandler | None = None
 
+_PROVIDER_LABELS = {
+    "fanfox": "FanFox",
+    "mangadex": "MangaDex",
+}
+
+
+class _DeterminateBarColumn(BarColumn):
+    def render(self, task: Task) -> RenderableType:
+        if task.total is None:
+            return Text()
+        return super().render(task)
+
+
+class _DeterminateMofNColumn(MofNCompleteColumn):
+    def render(self, task: Task) -> Text:
+        if task.total is None:
+            return Text()
+        return super().render(task)
+
+
+class _DeterminateTimeRemainingColumn(TimeRemainingColumn):
+    def render(self, task: Task) -> Text:
+        if task.total is None:
+            return Text()
+        return super().render(task)
+
 
 class _ProgressDisplay:
     def __init__(self, console: Console):
@@ -42,10 +77,10 @@ class _ProgressDisplay:
         self.progress = Progress(
             SpinnerColumn(style="mangapy.info"),
             TextColumn("{task.description}", style="mangapy.info", markup=False),
-            BarColumn(),
-            MofNCompleteColumn(),
-            TextColumn("pages", markup=False),
-            TimeRemainingColumn(compact=True),
+            _DeterminateBarColumn(bar_width=24),
+            _DeterminateMofNColumn(),
+            TextColumn("{task.fields[unit]}", markup=False),
+            _DeterminateTimeRemainingColumn(compact=True),
             console=console,
             transient=True,
             redirect_stdout=False,
@@ -85,6 +120,9 @@ class DownloadProgress:
         self._display = _ProgressDisplay(console) if console is not None else _get_shared_progress_display()
         self._progress = self._display.progress
         self._context_local = threading.local()
+        self._lifecycle_lock = threading.Lock()
+        self._active_contexts = 0
+        self._session_task_id: TaskID | None = None
 
     @property
     def enabled(self) -> bool:
@@ -97,6 +135,8 @@ class DownloadProgress:
         active = self._requested_enabled and self._display.console.is_terminal
         if active:
             self._display.acquire()
+            with self._lifecycle_lock:
+                self._active_contexts += 1
         states = getattr(self._context_local, "states", None)
         if states is None:
             states = []
@@ -107,12 +147,64 @@ class DownloadProgress:
     def __exit__(self, exc_type, exc_value, traceback) -> None:
         active = self._context_local.states.pop()
         if active:
+            session_task_id = None
+            with self._lifecycle_lock:
+                self._active_contexts -= 1
+                if self._active_contexts == 0:
+                    session_task_id = self._session_task_id
+                    self._session_task_id = None
+            if session_task_id is not None:
+                self._progress.remove_task(session_task_id)
             self._display.release()
+
+    def start_search(self, title: str, source: str) -> None:
+        if not self.enabled:
+            return
+        description = f"Searching · {title} · {provider_label(source)}"
+        with self._lifecycle_lock:
+            if self._session_task_id is None:
+                self._session_task_id = self._progress.add_task(description, total=None, unit="")
+            else:
+                self._progress.update(self._session_task_id, description=description, total=None, completed=0, unit="")
+
+    def start_download(self, title: str, source: str, total_chapters: int) -> None:
+        if not self.enabled:
+            return
+        description = f"{title} · {provider_label(source)}"
+        with self._lifecycle_lock:
+            if self._session_task_id is None:
+                self._session_task_id = self._progress.add_task(
+                    description,
+                    total=total_chapters,
+                    unit="chapters",
+                )
+            else:
+                self._progress.update(
+                    self._session_task_id,
+                    description=description,
+                    total=total_chapters,
+                    completed=0,
+                    unit="chapters",
+                )
+
+    def advance_download(self) -> None:
+        with self._lifecycle_lock:
+            task_id = self._session_task_id
+        if task_id is not None:
+            self._progress.advance(task_id)
+
+    def clear_session(self) -> None:
+        with self._lifecycle_lock:
+            task_id = self._session_task_id
+            self._session_task_id = None
+        if task_id is not None:
+            self._progress.remove_task(task_id)
+            self._progress.refresh()
 
     def add_chapter(self, chapter_name: str, total_pages: int) -> TaskID | None:
         if not self.enabled:
             return None
-        return self._progress.add_task(f"Chapter {chapter_name}", total=total_pages)
+        return self._progress.add_task(f"  Chapter {chapter_name}", total=total_pages, unit="pages")
 
     def advance(self, task_id: TaskID | None) -> None:
         if task_id is not None:
@@ -193,3 +285,7 @@ def _message_text(message: object, *, kind: MessageKind, icon: str | None = None
     text.append("  ")
     text.append(str(message))
     return text
+
+
+def provider_label(source: str) -> str:
+    return _PROVIDER_LABELS.get(source.casefold(), source)
