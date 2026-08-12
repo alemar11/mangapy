@@ -165,6 +165,16 @@ class ReleaseResolverAssetTests(unittest.TestCase):
         self.assertIn("source_sha: ${{ needs.final.outputs.source_sha }}", release_version)
         self.assertNotIn("gh workflow run release.yml", release_version)
 
+    def test_homebrew_publication_is_delegated_to_tap_ci(self) -> None:
+        release = RELEASE_WORKFLOW.read_text(encoding="utf-8")
+        self.assertLess(release.index("Publish to PyPI"), release.index("Update Homebrew formula"))
+        self.assertIn("Open or update Homebrew formula pull request", release)
+        self.assertIn("gh pr create", release)
+        self.assertIn("automation/mangapy-v${VERSION}", release)
+        self.assertNotIn("Validate Homebrew formula", release)
+        self.assertNotIn("brew install --build-from-source mangapy", release)
+        self.assertNotIn("brew test mangapy", release)
+
     def test_single_release_version_ui_contains_all_operation_choices(self) -> None:
         workflow = RELEASE_VERSION_WORKFLOW.read_text(encoding="utf-8")
         dispatch = workflow.split("\npermissions: {}", 1)[0]

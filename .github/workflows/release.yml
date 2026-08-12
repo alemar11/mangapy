@@ -247,6 +247,22 @@ jobs:
           token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
           path: homebrew-tap
 
+      - name: Prepare Homebrew formula branch
+        id: homebrew
+        working-directory: homebrew-tap
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          set -euo pipefail
+          branch="automation/mangapy-v${VERSION}"
+          git fetch origin main
+          git fetch origin \
+            "refs/heads/${branch}:refs/remotes/origin/${branch}" || true
+          git switch --force-create "${branch}" origin/main
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          echo "branch=${branch}" >> "${GITHUB_OUTPUT}"
+
       - name: Trust Homebrew formula
         run: brew trust --formula alemar11/tap/mangapy
 
@@ -329,31 +345,74 @@ jobs:
           ARCHIVE_SHA256: ${{ steps.archive.outputs.sha256 }}
           VERSION: ${{ steps.meta.outputs.version }}
 
-      - name: Validate Homebrew formula
-        working-directory: homebrew-tap
-        run: |
-          set -euo pipefail
-          tap_root="$(brew --repository)/Library/Taps/alemar11"
-          mkdir -p "${tap_root}"
-          rm -rf "${tap_root}/homebrew-tap"
-          ln -s "${PWD}" "${tap_root}/homebrew-tap"
-          brew audit --strict --online mangapy
-          brew uninstall --force mangapy || true
-          brew install --build-from-source mangapy
-          brew test mangapy
-
-      - name: Commit Homebrew formula
+      - name: Open or update Homebrew formula pull request
         working-directory: homebrew-tap
         env:
+          BRANCH: ${{ steps.homebrew.outputs.branch }}
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
           VERSION: ${{ steps.meta.outputs.version }}
         run: |
           set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          changed_files="$(git status --short | awk '{print $2}')"
+          if [[ -n "${changed_files}" && "${changed_files}" != "Formula/mangapy.rb" ]]; then
+            echo "Refusing to publish unexpected Homebrew changes:" >&2
+            printf '%s\n' "${changed_files}" >&2
+            exit 1
+          fi
+
           git add Formula/mangapy.rb
           if git diff --cached --quiet; then
             echo "Homebrew formula is already up to date."
             exit 0
           fi
+
           git commit -m "Update mangapy to ${VERSION}"
-          git push
+          git push --force-with-lease="refs/heads/${BRANCH}" origin "HEAD:${BRANCH}"
+
+          pr_number="$(
+            gh pr list \
+              --repo alemar11/homebrew-tap \
+              --base main \
+              --head "${BRANCH}" \
+              --state open \
+              --json number \
+              --jq '.[0].number // empty'
+          )"
+          if [[ -z "${pr_number}" ]]; then
+            pr_url="$(
+              gh pr create \
+                --repo alemar11/homebrew-tap \
+                --base main \
+                --head "${BRANCH}" \
+                --title "Update mangapy to ${VERSION}" \
+                --body "Automated formula update for mangapy v${VERSION}. Homebrew test-bot validates the formula and publishes its bottles after this exact commit passes."
+            )"
+            pr_number="${pr_url##*/}"
+          fi
+
+          head_sha="$(git rev-parse HEAD)"
+          read -r actual_base actual_head actual_sha state is_draft < <(
+            gh pr view "${pr_number}" \
+              --repo alemar11/homebrew-tap \
+              --json baseRefName,headRefName,headRefOid,state,isDraft \
+              --jq '[.baseRefName, .headRefName, .headRefOid, .state, .isDraft] | @tsv'
+          )
+          if [[ "${actual_base}" != "main" || "${actual_head}" != "${BRANCH}" ||
+            "${actual_sha}" != "${head_sha}" || "${state}" != "OPEN" ||
+            "${is_draft}" != "false" ]]; then
+            echo "Homebrew pull request does not match the published formula commit." >&2
+            exit 1
+          fi
+
+          pr_files="$(
+            gh api --paginate \
+              "repos/alemar11/homebrew-tap/pulls/${pr_number}/files" \
+              --jq '.[].filename'
+          )"
+          if [[ "${pr_files}" != "Formula/mangapy.rb" ]]; then
+            echo "Homebrew pull request contains unexpected files." >&2
+            printf '%s\n' "${pr_files}" >&2
+            exit 1
+          fi
+          echo "Homebrew formula pull request: https://github.com/alemar11/homebrew-tap/pull/${pr_number}"
