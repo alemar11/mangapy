@@ -21,6 +21,35 @@
       "console": "integratedTerminal"
     },
     {
+      "name": "Python: MangaPy CLI (YAML)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "mangapy.cli",
+      "args": [
+        "yaml",
+        "samples/sample.yaml"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Python: MangaPy CLI (title)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "mangapy.cli",
+      "args": [
+        "title",
+        "One Piece",
+        "--source",
+        "mangadex",
+        "--chapter",
+        "1",
+        "--no-progress"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
+    },
+    {
       "name": "Python: All offline tests",
       "type": "debugpy",
       "request": "launch",
