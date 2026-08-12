@@ -1,5 +1,6 @@
 import logging
 from io import StringIO
+from threading import Thread
 from unittest.mock import Mock
 
 import pytest
@@ -194,6 +195,70 @@ def test_download_progress_preserves_literal_chapter_names():
     console.print(progress._progress.get_renderable())
 
     assert "Chapter [red]literal[/red]" in output.getvalue()
+
+
+def test_download_progress_transitions_from_search_to_download_summary():
+    output = StringIO()
+    progress = terminal.DownloadProgress(
+        console=Console(file=output, force_terminal=True, color_system=None, theme=terminal._THEME)
+    )
+
+    with progress:
+        progress.start_search("Bleach", "fanfox")
+        session_task = progress._progress.tasks[0]
+        assert session_task.description == "Searching · Bleach · FanFox"
+        assert session_task.total is None
+        assert session_task.fields["unit"] == ""
+        search_renderable = progress._progress.get_renderable()
+        search_output = StringIO()
+        Console(file=search_output, force_terminal=False, width=100).print(search_renderable)
+        assert "0/?" not in search_output.getvalue()
+
+        progress.start_download("Bleach", "fanfox", 2)
+        progress.advance_download()
+
+        session_task = progress._progress.tasks[0]
+        assert session_task.description == "Bleach · FanFox"
+        assert session_task.total == 2
+        assert session_task.completed == 1
+        assert session_task.fields["unit"] == "chapters"
+
+    assert progress._progress.tasks == []
+
+
+def test_download_session_survives_a_nested_worker_context():
+    progress = terminal.DownloadProgress(
+        console=Console(file=StringIO(), force_terminal=True, color_system=None, theme=terminal._THEME)
+    )
+
+    with progress:
+        progress.start_search("Bleach", "fanfox")
+
+        worker = Thread(target=lambda: _enter_progress_once(progress))
+        worker.start()
+        worker.join(timeout=2)
+
+        assert not worker.is_alive()
+        assert len(progress._progress.tasks) == 1
+
+    assert progress._progress.tasks == []
+
+
+def test_download_progress_can_clear_search_before_an_error_message():
+    progress = terminal.DownloadProgress(
+        console=Console(file=StringIO(), force_terminal=True, color_system=None, theme=terminal._THEME)
+    )
+
+    with progress:
+        progress.start_search("Missing", "fanfox")
+        progress.clear_session()
+
+        assert progress._progress.tasks == []
+
+
+def _enter_progress_once(progress):
+    with progress:
+        pass
 
 
 def test_download_progress_instances_share_one_global_lifecycle(monkeypatch):

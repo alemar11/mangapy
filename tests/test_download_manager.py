@@ -6,6 +6,8 @@ from mangapy.chapter_archiver import ArchiveResult, ChapterArchiver
 from mangapy.download_manager import (
     DownloadManager,
     DownloadRequest,
+    DownloadResult,
+    _download_summary,
     _select_chapters,
     _select_manga_subdirectory,
     _summarize_archive_results,
@@ -73,6 +75,9 @@ def test_download_manager_parallel_chapters(monkeypatch, tmp_path):
             self.enabled = enabled
             self.entered = 0
             self.exited = 0
+            self.searches = []
+            self.downloads = []
+            self.advanced_downloads = 0
             progress_instances.append(self)
 
         def __enter__(self):
@@ -81,6 +86,18 @@ def test_download_manager_parallel_chapters(monkeypatch, tmp_path):
 
         def __exit__(self, exc_type, exc_value, traceback):
             self.exited += 1
+
+        def start_search(self, title, source):
+            self.searches.append((title, source))
+
+        def start_download(self, title, source, total_chapters):
+            self.downloads.append((title, source, total_chapters))
+
+        def advance_download(self):
+            self.advanced_downloads += 1
+
+        def clear_session(self):
+            pass
 
     monkeypatch.setattr("mangapy.download_manager.get_repository", lambda name: repo)
     monkeypatch.setattr(terminal, "DownloadProgress", RecordingProgress)
@@ -119,6 +136,9 @@ def test_download_manager_parallel_chapters(monkeypatch, tmp_path):
     assert progress_instances[0].enabled
     assert progress_instances[0].entered == 1
     assert progress_instances[0].exited == 1
+    assert progress_instances[0].searches == [("dummy", "fanfox")]
+    assert progress_instances[0].downloads == [("dummy", "fanfox", 2)]
+    assert progress_instances[0].advanced_downloads == 2
     assert worker_batch_lifecycle == ["entered", "exited"]
     assert result.succeeded
     assert result.downloaded_chapters == 2
@@ -216,6 +236,14 @@ def test_download_result_rejects_inconsistent_success_counts():
     assert not result.succeeded
     assert result.downloaded_chapters == 0
     assert result.failed_chapters == 1
+
+
+def test_download_summary_omits_zero_counts_and_pluralizes_chapters():
+    assert _download_summary(DownloadResult(selected_chapters=1, downloaded_chapters=1)) == "1 chapter downloaded"
+    assert (
+        _download_summary(DownloadResult(selected_chapters=3, downloaded_chapters=2, existing_chapters=1))
+        == "2 chapters downloaded, 1 chapter already present"
+    )
 
 
 def test_download_manager_invalid_source_returns_failure(monkeypatch):
