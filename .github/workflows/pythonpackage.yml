@@ -5,10 +5,10 @@ on:
     - cron: "0 23 */2 * *"
   push:
     branches:
-      - master
+      - main
   pull_request:
     branches:
-      - master
+      - main
   workflow_dispatch:
 
 jobs:

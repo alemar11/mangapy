@@ -19,7 +19,7 @@ uv lock --check
 uv run --locked pytest -q -m "not live"
 ```
 
-4. Merge the release commit to `master`.
+4. Merge the release commit to `main`.
 5. Tag the release with the package version, without a `v` prefix:
 
 ```
