@@ -19,22 +19,26 @@ uv lock --check
 uv run --locked pytest -q -m "not live"
 ```
 
-4. Merge the release commit to `main`.
-5. Tag the release with the package version, without a `v` prefix:
+4. Merge the version bump to `main`.
+5. Tag the merged commit and push the tag:
 
-```
+```bash
 release_version="X.Y.Z"
-git tag "${release_version}"
-git push origin "${release_version}"
+release_commit="<SHA of the merged version bump>"
+git tag -a "v${release_version}" "${release_commit}" -m "Release v${release_version}"
+git push origin "refs/tags/v${release_version}"
 ```
 
-The release workflow validates that the tag matches `pyproject.toml`, builds
-the package, publishes it to PyPI with Trusted Publishing, updates the
-Homebrew formula URL and checksum, attempts to refresh Python resources, and
-then validates the formula. The resource refresh explicitly bypasses
-Homebrew's cooldown for newly uploaded main-package files, retries transient
-PyPI propagation failures, and stops the release rather than publishing stale
-dependency resources if every attempt fails.
+The workflow checks that the tagged commit is on `main` and that the tag
+matches `pyproject.toml`. After the offline tests and build pass, it creates
+`release/vX.Y.Z` at the tagged commit, publishes to PyPI with Trusted
+Publishing, and opens or updates the formula PR in the Homebrew tap.
+The tap CI validates the formula and handles bottle publishing.
+
+To retry, rerun the workflow or launch **Publish tagged release** from
+`main` with the same tag. It reuses a release branch at the tagged commit
+and skips the PyPI upload if both artifacts are already published. A release
+branch pointing to a different commit stops the workflow.
 
 ## Manual build and publish
 
@@ -57,7 +61,7 @@ matching GitHub tag archive and refresh resources if dependency pins changed:
 ```
 release_version="X.Y.Z"
 archive_path="/tmp/mangapy-${release_version}.tar.gz"
-curl --fail --location "https://github.com/alemar11/mangapy/archive/refs/tags/${release_version}.tar.gz" --output "${archive_path}"
+curl --fail --location "https://github.com/alemar11/mangapy/archive/refs/tags/v${release_version}.tar.gz" --output "${archive_path}"
 shasum -a 256 "${archive_path}"
 brew update-python-resources --ignore-main-package-cooldown --exclude-packages pillow --package-name mangapy --version "${release_version}" Formula/mangapy.rb
 brew audit --strict --online mangapy
