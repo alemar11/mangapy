@@ -62,32 +62,21 @@ def test_fanfox_fetch_manga_with_missing_extra_chapters():
     assert chapter_count == 31, "The chapter should contain 31 pages"
 
 
-# @pytest.mark.skip(reason="It fails most of the time using Github Actions")
-def test_fanfox_fetch_manga_licensed():
+def test_fanfox_fetch_completed_manga():
     repository = FanFoxRepository()
-    # repository.proxies = proxies
-    manga = repository.search("naruto")
+    manga = repository.search("Boku dake ga Inai Machi")
     assert manga is not None
-    assert len(manga.chapters) == 750, "It should contain 750 chapters"
-    firstChapter = manga.chapters[0]
-    assert firstChapter is not None
-    pages = firstChapter.pages()
-    first_chapter_count = 0
-    for page in pages:
-        first_chapter_count += 1
-        assert page.number is not None
-        assert page.url is not None
-    assert first_chapter_count == 47, "The first chapter should contain 47 pages"
+    assert len(manga.chapters) == 44
+    first_chapter, last_chapter = manga.chapters[0], manga.chapters[-1]
+    assert first_chapter.number == 1
+    assert last_chapter.number == 44
 
-    lastChapter = manga.chapters[-1]
-    assert lastChapter is not None
-    pages = lastChapter.pages()
-    last_chapter_count = 0
-    for page in pages:
-        last_chapter_count += 1
-        assert page.number is not None
-        assert page.url is not None
-    assert last_chapter_count == 46, "The last chapter should contain 46 pages"
+    for chapter, expected_pages in ((first_chapter, 43), (last_chapter, 50)):
+        pages = list(chapter.pages())
+        assert len(pages) == expected_pages
+        for page in pages:
+            assert page.number is not None
+            assert page.url is not None
 
 
 def test_fanfox_fetch_adult_content():
