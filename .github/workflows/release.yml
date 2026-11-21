@@ -220,7 +220,12 @@ jobs:
           ruby <<'RUBY'
             path = "Formula/mangapy.rb"
             formula = File.read(path)
-            formula = formula.sub(%r{url "https://github.com/alemar11/mangapy/archive/refs/tags/[^"]+[.]tar[.]gz"}, %(url "#{ENV.fetch("ARCHIVE_URL")}"))
+            archive_url = ENV.fetch("ARCHIVE_URL")
+            previous_url = formula[%r{^  url "(https://github.com/alemar11/mangapy/archive/refs/tags/[^"]+[.]tar[.]gz)"$}, 1]
+            if previous_url && previous_url != archive_url
+              formula = formula.sub(/^  bottle do\n.*?^  end\n\n?/m, "")
+            end
+            formula = formula.sub(%r{url "https://github.com/alemar11/mangapy/archive/refs/tags/[^"]+[.]tar[.]gz"}, %(url "#{archive_url}"))
             formula = formula.sub(/sha256 "[0-9a-f]{64}"/, %(sha256 "#{ENV.fetch("ARCHIVE_SHA256")}"))
             formula = formula.gsub("__ARCHIVE_URL__", ENV.fetch("ARCHIVE_URL"))
             formula = formula.gsub("__ARCHIVE_SHA256__", ENV.fetch("ARCHIVE_SHA256"))
@@ -298,7 +303,7 @@ jobs:
                 --base main \
                 --head "${BRANCH}" \
                 --title "Update mangapy to ${VERSION}" \
-                --body "Automated formula update for mangapy v${VERSION}. Homebrew test-bot validates the formula and publishes its bottles after this exact commit passes."
+                --body "Automated formula update for mangapy v${VERSION}. Leave this pull request open for brew pr-pull. After Homebrew test-bot passes, brew pr-pull publishes the bottle and pushes the updated formula to main."
             )"
             pr_number="${pr_url##*/}"
           fi
