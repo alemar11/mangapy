@@ -5,8 +5,7 @@
 **Download manga chapters from the terminal as images or PDFs.**
 
 [![PyPI](https://img.shields.io/pypi/v/mangapy?logo=pypi&logoColor=white)](https://pypi.org/project/mangapy/)
-[![Python](https://img.shields.io/pypi/pyversions/mangapy?logo=python&logoColor=white)](https://pypi.org/project/mangapy/)
-[![Build](https://github.com/alemar11/mangapy/actions/workflows/pythonpackage.yml/badge.svg)](https://github.com/alemar11/mangapy/actions/workflows/pythonpackage.yml)
+[![Build](https://github.com/alemar11/mangapy/actions/workflows/rust.yml/badge.svg)](https://github.com/alemar11/mangapy/actions/workflows/rust.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 [Getting started](#getting-started) · [CLI examples](#cli-examples) · [YAML mode](#yaml-mode) · [Configuration](#configuration) · [Development setup](#development-setup)
@@ -47,6 +46,19 @@ archive.
 > [YAML mode](#mangadex-options).
 
 ## Getting started
+
+### Install a standalone executable
+
+Download the archive for your operating system and architecture from
+[GitHub Releases](https://github.com/alemar11/mangapy/releases). Extract it
+and put the executable on your `PATH`.
+
+### Build from source
+
+```console
+cargo install --locked --path .
+mangapy --version
+```
 
 ### Install with pipx
 
@@ -256,7 +268,7 @@ More ready-to-run configurations are available in [`samples/`](samples/). To
 run one directly from a source checkout:
 
 ```console
-uv run python3 scripts/dev_run.py sample.yaml
+cargo run --locked -- yaml samples/sample.yaml
 ```
 
 ## Configuration
@@ -268,7 +280,7 @@ directory. Image mode stores page files under an `images` directory; PDF mode
 creates one PDF per chapter.
 
 Mangapy owns each completed chapter image directory. After a successful image
-download, stale regular files in that chapter directory are removed so the
+download, stale numbered page files with recognized image extensions are removed so the
 local pages match the provider response.
 
 ### Exit codes
@@ -282,36 +294,17 @@ local pages match the provider response.
 
 ## Development setup
 
-Install [`mise`](https://mise.jdx.dev/) and clone the repository:
+Install stable Rust with [rustup](https://rustup.rs/) or run `mise install`.
 
 ```console
-git clone https://github.com/alemar11/mangapy.git
-cd mangapy
-mise install
-mise run setup
+cargo fmt --check
+cargo clippy --locked --all-targets -- -D warnings
+cargo test --locked
+cargo run --locked -- --help
 ```
 
-`mise install` provides the required Python 3.14 and [`uv`](https://docs.astral.sh/uv/).
-`mise run setup` creates the project-local `.venv` and installs the application
-and development dependencies.
-
-Verify the checkout:
-
-```console
-mise run lint
-mise run test
-uv run mangapy --help
-```
-
-The default test command excludes live provider tests because they contact
-third-party services and may be affected by site changes or rate limits.
-
-When opening the repository in VS Code, accept the recommended Python, Python
-Environments, Python Debugger, and Ruff extensions. Select `.venv` as the Python
-interpreter if VS Code does not detect it automatically.
-
-See [Development](docs/Development.md) for the complete editor workflow and
-[Tests](docs/Tests.md) for live-provider and targeted test commands.
+See [Development](docs/Development.md), [Tests](docs/Tests.md), and
+[Distribution](docs/Distribution.md).
 
 ## License
 

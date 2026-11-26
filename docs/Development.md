@@ -1,48 +1,23 @@
-## Development
+# Development
 
-## Configure VS Code
+Install stable Rust with `rustup` or `mise install`. Run the executable from the
+checkout with `cargo run --locked -- title "Backstage Lovers" -s mangadex` or
+`cargo run --locked -- yaml samples/sample.yaml`.
 
-Open the repository in VS Code and accept its recommended Python, Python
-Environments, Python Debugger, and Ruff extensions. VS Code automatically
-discovers and prioritizes the workspace-local `.venv`; the tracked settings
-enable pytest discovery and configure Ruff for formatting, safe fixes, and
-import organization on save. Ruff reads its lint and formatting rules from
-`pyproject.toml`, including the 130-character line length.
+- `src/main.rs` handles CLI arguments. `src/config.rs` resolves YAML and
+  output defaults into a typed request.
+- `src/download.rs` plans and executes requests. `src/selection.rs` is shared
+  with the benchmark.
+- `src/provider.rs` defines the provider interface, shared HTTP behavior, and MangaDex.
+- `src/provider/fanfox.rs` handles FanFox HTML and packed scripts.
+- `src/archive.rs` handles output paths, image validation, and PDF creation.
 
-The repository's `mise.toml` selects Python 3.14 and uv. Run `mise install` and
-`mise run setup` before opening VS Code. The `.venv` interpreter remains the
-correct VS Code selection: uv creates it from mise's Python while keeping the
-project dependencies isolated.
+Use rust-analyzer in VS Code. Run `cargo fmt` before submitting changes.
 
-After running `uv sync`, tests appear in Test Explorer. They can be run or
-debugged individually there. The Run and Debug view also provides configurations
-for the current Python file, the MangaPy CLI, the complete offline test suite,
-and a selected test. The CLI configuration uses `--version` by default; replace
-its `args` in `.vscode/launch.json` when debugging a download.
+The native benchmark writes elapsed milliseconds as JSON. Use `--pages`,
+`--images`, `--pdf`, or `--pdf-only` to select phases, and `--rounds` to
+repeat a measurement. Pass `--out` to choose where it stores downloads.
 
-## Installation
-
-Sync the environment:
-
-```
-mise install
-mise run setup
-```
-
-By default, uv includes the `dev` dependency group; use `uv sync --no-dev` to exclude it.
-
-Run the deterministic, offline test suite inside the environment (this is the
-default pytest selection):
-
-```
-mise run test
-```
-
-See [Tests.md](Tests.md) for the live-provider and complete-suite commands.
-
-Recreate the virtual env:
-
-```
-rm -rf .venv
-uv sync
+```console
+cargo run --release --locked --example benchmark -- -s mangadex -t "Backstage Lovers" --pages
 ```

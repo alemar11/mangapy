@@ -1,77 +1,35 @@
-## Distribution
+# Distribution
 
-`mangapy` is distributed through PyPI for `pipx` users and through the
-`alemar11/homebrew-tap` Homebrew tap for Brew users.
+GitHub Releases distributes standalone Rust executables for macOS and Linux
+on ARM64 and x86-64, and Windows on x86-64. PyPI wheels contain the same
+executables. Homebrew builds from the tagged source with Cargo.
 
 ## Release flow
 
-1. Bump the package version in `pyproject.toml`.
-2. Update and verify the lockfile:
+1. Bump the version in `Cargo.toml`, run `cargo check` to update `Cargo.lock`,
+   then run `cargo test --locked`.
+2. Merge the version bump to `main`.
+3. Tag the merged commit with a stable `vX.Y.Z` and push that tag.
 
-```
-uv lock
-uv lock --check
-```
+The workflow verifies the tag and its commit on `main`, tests and builds the
+release matrix, and creates `release/vX.Y.Z` at the tagged commit. It publishes
+the wheels and source distribution to PyPI using Trusted Publishing, uploads
+the native archives to GitHub Releases, and opens or updates the Homebrew
+formula PR in `alemar11/homebrew-tap`. Tap CI handles bottle publishing.
 
-3. Run the offline preflight tests:
+To retry publishing with the same built artifacts, rerun failed jobs. To rebuild
+from the tagged commit, dispatch **Publish tagged release** from
+`main` with the existing tag. Keep the PyPI Trusted Publisher configured for
+`.github/workflows/release.yml` and the repository secret `HOMEBREW_TAP_TOKEN`
+configured with write access to the tap.
 
-```
-uv run --locked pytest -q -m "not live"
-```
+## Local packaging
 
-4. Merge the version bump to `main`.
-5. Tag the merged commit and push the tag:
-
-```bash
-release_version="X.Y.Z"
-release_commit="<SHA of the merged version bump>"
-git tag -a "v${release_version}" "${release_commit}" -m "Release v${release_version}"
-git push origin "refs/tags/v${release_version}"
-```
-
-The workflow checks that the tagged commit is on `main` and that the tag
-matches `pyproject.toml`. After the offline tests and build pass, it creates
-`release/vX.Y.Z` at the tagged commit, publishes to PyPI with Trusted
-Publishing, and opens or updates the formula PR in the Homebrew tap.
-The tap CI validates the formula and handles bottle publishing.
-
-To retry, rerun the workflow or launch **Publish tagged release** from
-`main` with the same tag. It reuses a release branch at the tagged commit
-and skips the PyPI upload if both artifacts are already published. A release
-branch pointing to a different commit stops the workflow.
-
-## Manual build and publish
-
-If CI publishing is unavailable, build and publish PyPI artifacts manually:
-
-```
-uv build
-uv publish
+```console
+cargo build --release --locked
+uvx maturin build --release --locked --out dist
+uvx maturin sdist --out dist
 ```
 
-Or, using a token:
-
-```
-UV_PUBLISH_TOKEN=... uv publish
-```
-
-Then update the Homebrew formula in `alemar11/homebrew-tap` to point at the
-matching GitHub tag archive and refresh resources if dependency pins changed:
-
-```
-release_version="X.Y.Z"
-archive_path="/tmp/mangapy-${release_version}.tar.gz"
-curl --fail --location "https://github.com/alemar11/mangapy/archive/refs/tags/v${release_version}.tar.gz" --output "${archive_path}"
-shasum -a 256 "${archive_path}"
-brew update-python-resources --ignore-main-package-cooldown --exclude-packages pillow --package-name mangapy --version "${release_version}" Formula/mangapy.rb
-brew audit --strict --online mangapy
-brew install --build-from-source mangapy
-brew test mangapy
-```
-
-## Required GitHub/PyPI setup
-
-- Configure PyPI Trusted Publishing for `alemar11/mangapy` and
-  `.github/workflows/release.yml`.
-- Add a `HOMEBREW_TAP_TOKEN` repository secret with write access to
-  `alemar11/homebrew-tap`.
+On Linux, use `maturin[zig]` with `--zig --compatibility manylinux_2_28` for a
+portable wheel. The standalone binary needs no Python runtime.

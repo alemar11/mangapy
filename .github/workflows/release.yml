@@ -18,7 +18,85 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  build:
+    if: >-
+      (github.event_name == 'push' && github.event.created) ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, target: x86_64-unknown-linux-gnu }
+          - { os: ubuntu-24.04-arm, target: aarch64-unknown-linux-gnu }
+          - { os: macos-latest, target: aarch64-apple-darwin }
+          - { os: macos-15-intel, target: x86_64-apple-darwin }
+          - { os: windows-latest, target: x86_64-pc-windows-msvc }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: refs/tags/${{ inputs.tag || github.ref_name }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check the release commit and Cargo version
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          [[ "$TAG" =~ ^v(0|[1-9][0-9]*)[.](0|[1-9][0-9]*)[.](0|[1-9][0-9]*)$ ]]
+          git merge-base --is-ancestor HEAD refs/remotes/origin/main
+          if [[ "$EVENT_NAME" == push ]]; then
+            test "$(git rev-parse HEAD)" = "$(git rev-parse "$EVENT_SHA^{commit}")"
+          fi
+          rustup update stable
+          version="$(cargo +stable pkgid --locked | sed 's/.*[#@]//')"
+          test "$TAG" = "v$version"
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+      - name: Test and package binary
+        env:
+          TARGET: ${{ matrix.target }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          SOURCE_DATE_EPOCH="$(git show -s --format=%ct HEAD)"
+          export SOURCE_DATE_EPOCH
+          cargo +stable test --locked --all-targets
+          if [[ "$RUNNER_OS" == Linux ]]; then
+            uvx --from 'maturin[zig]>=1.9,<2' maturin build --release --locked --strip --target "$TARGET" --zig --compatibility manylinux_2_28 --out out
+          else
+            uvx --from 'maturin>=1.9,<2' maturin build --release --locked --strip --target "$TARGET" --out out
+          fi
+          if [[ "$TARGET" == x86_64-unknown-linux-gnu ]]; then
+            uvx --from 'maturin>=1.9,<2' maturin sdist --out out
+          fi
+          uv run --no-project python -m zipfile -e out/*.whl unpacked
+          mkdir bundle
+          if [[ "$RUNNER_OS" == Windows ]]; then
+            mv unpacked/*.data/scripts/mangapy.exe bundle/
+            ./bundle/mangapy.exe --version
+          else
+            mv unpacked/*.data/scripts/mangapy bundle/
+            chmod +x bundle/mangapy
+            ./bundle/mangapy --version
+          fi
+          cp LICENSE README.md bundle/
+          tar -czf "out/mangapy-${TAG#v}-${TARGET}.tar.gz" -C bundle .
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: mangapy-${{ matrix.target }}
+          path: out/*
+          if-no-files-found: error
+
   release:
+    needs: build
     if: >-
       (github.event_name == 'push' && github.event.created) ||
       (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
@@ -65,38 +143,20 @@ jobs:
             exit 1
           fi
 
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
-        with:
-          python-version: "3.14"
       - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
-          enable-cache: true
+          pattern: mangapy-*
+          merge-multiple: true
+          path: artifacts
 
-      - name: Validate release tag
+      - name: Read release metadata
         id: meta
         env:
           TAG: ${{ steps.tag.outputs.name }}
         run: |
-          set -euo pipefail
-          tag="${TAG}"
-          version="${tag#v}"
-          project_version="$(python -c 'import pathlib, tomllib; print(tomllib.loads(pathlib.Path("pyproject.toml").read_text())["project"]["version"])')"
-          if [[ "${version}" != "${project_version}" ]]; then
-            echo "Tag ${version} does not match pyproject.toml version ${project_version}" >&2
-            exit 1
-          fi
-          archive_url="https://github.com/alemar11/mangapy/archive/refs/tags/${tag}.tar.gz"
-          echo "version=${version}" >> "${GITHUB_OUTPUT}"
-          echo "archive_url=${archive_url}" >> "${GITHUB_OUTPUT}"
-
-      - name: Check lockfile
-        run: uv lock --check
-
-      - name: Run offline tests
-        run: uv run --locked pytest -q -m "not live"
-
-      - name: Build distributions
-        run: uv build
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+          echo "archive_url=https://github.com/${GITHUB_REPOSITORY}/archive/refs/tags/${TAG}.tar.gz" >> "$GITHUB_OUTPUT"
 
       - name: Create release branch
         env:
@@ -130,13 +190,26 @@ jobs:
           VERSION: ${{ steps.meta.outputs.version }}
         run: |
           set -euo pipefail
-          index_url="https://pypi.org/simple/mangapy/"
-          index="$(curl --fail --location --silent --show-error "${index_url}")"
-          if grep -Fq "mangapy-${VERSION}-py3-none-any.whl" <<< "${index}" &&
-            grep -Fq "mangapy-${VERSION}.tar.gz" <<< "${index}"; then
-            echo "mangapy ${VERSION} is already published on PyPI; skipping upload."
+          package_dir="$(mktemp -d)"
+          cp artifacts/*.whl "artifacts/mangapy-${VERSION}.tar.gz" "$package_dir/"
+          uv publish --trusted-publishing automatic --check-url https://pypi.org/simple/ "$package_dir/"*
+
+      - name: Publish native archives to GitHub Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.name }}
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          set -euo pipefail
+          assets=(artifacts/mangapy-"$VERSION"-*.tar.gz)
+          if published="$(gh release view "$TAG" --json assets --jq '.assets[].name' 2>/dev/null)"; then
+            for asset in "${assets[@]}"; do
+              if ! grep -Fxq "${asset##*/}" <<< "$published"; then
+                gh release upload "$TAG" "$asset"
+              fi
+            done
           else
-            uv publish --trusted-publishing automatic --check-url https://pypi.org/simple/
+            gh release create "$TAG" "${assets[@]}" --verify-tag --generate-notes
           fi
 
       - name: Compute source archive checksum
@@ -175,40 +248,32 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           echo "branch=${branch}" >> "${GITHUB_OUTPUT}"
 
-      - name: Trust Homebrew formula
-        run: brew trust --formula alemar11/tap/mangapy
-
-      - name: Update Homebrew formula
+      - name: Write Rust Homebrew formula
         working-directory: homebrew-tap
+        env:
+          ARCHIVE_URL: ${{ steps.meta.outputs.archive_url }}
+          ARCHIVE_SHA256: ${{ steps.archive.outputs.sha256 }}
         run: |
           set -euo pipefail
-          tap_root="$(brew --repository)/Library/Taps/alemar11"
-          mkdir -p "${tap_root}"
-          rm -rf "${tap_root}/homebrew-tap"
-          ln -s "${PWD}" "${tap_root}/homebrew-tap"
-          formula_path="${tap_root}/homebrew-tap/Formula/mangapy.rb"
           mkdir -p Formula
-          if [[ ! -f Formula/mangapy.rb ]]; then
-            cat > Formula/mangapy.rb <<'RUBY'
+          if [[ -f Formula/mangapy.rb ]] &&
+            grep -Fqx "  url \"${ARCHIVE_URL}\"" Formula/mangapy.rb &&
+            grep -Fqx "  sha256 \"${ARCHIVE_SHA256}\"" Formula/mangapy.rb &&
+            grep -Fq "std_cargo_args" Formula/mangapy.rb; then
+            exit 0
+          fi
+          cat > Formula/mangapy.rb <<RUBY
           class Mangapy < Formula
-            include Language::Python::Virtualenv
-
             desc "Manga downloader"
             homepage "https://github.com/alemar11/mangapy"
-            url "__ARCHIVE_URL__"
-            sha256 "__ARCHIVE_SHA256__"
+            url "${ARCHIVE_URL}"
+            sha256 "${ARCHIVE_SHA256}"
             license "MIT"
 
-            depends_on "libyaml"
-            depends_on "pillow"
-            depends_on "python@3.14"
-            depends_on "qpdf"
-
-            uses_from_macos "libxml2", since: :ventura
-            uses_from_macos "libxslt"
+            depends_on "rust" => :build
 
             def install
-              virtualenv_install_with_resources using: "python@3.14"
+              system "cargo", "install", *std_cargo_args
             end
 
             test do
@@ -216,51 +281,7 @@ jobs:
             end
           end
           RUBY
-          fi
-          ruby <<'RUBY'
-            path = "Formula/mangapy.rb"
-            formula = File.read(path)
-            archive_url = ENV.fetch("ARCHIVE_URL")
-            previous_url = formula[%r{^  url "(https://github.com/alemar11/mangapy/archive/refs/tags/[^"]+[.]tar[.]gz)"$}, 1]
-            if previous_url && previous_url != archive_url
-              formula = formula.sub(/^  bottle do\n.*?^  end\n\n?/m, "")
-            end
-            formula = formula.sub(%r{url "https://github.com/alemar11/mangapy/archive/refs/tags/[^"]+[.]tar[.]gz"}, %(url "#{archive_url}"))
-            formula = formula.sub(/sha256 "[0-9a-f]{64}"/, %(sha256 "#{ENV.fetch("ARCHIVE_SHA256")}"))
-            formula = formula.gsub("__ARCHIVE_URL__", ENV.fetch("ARCHIVE_URL"))
-            formula = formula.gsub("__ARCHIVE_SHA256__", ENV.fetch("ARCHIVE_SHA256"))
-            formula = formula.gsub(/python@3[.]\d+/, "python@3.14")
-            unless formula.include?('depends_on "qpdf"')
-              formula = formula.sub(/(  depends_on "python@3[.]\d+"\n)/, %(\\1  depends_on "qpdf"\n))
-            end
-            macos_dependencies = []
-            unless formula.include?('uses_from_macos "libxml2"')
-              macos_dependencies << '  uses_from_macos "libxml2", since: :ventura'
-            end
-            unless formula.include?('uses_from_macos "libxslt"')
-              macos_dependencies << '  uses_from_macos "libxslt"'
-            end
-            unless macos_dependencies.empty?
-              formula = formula.sub(
-                /(  depends_on "qpdf"\n)/,
-                "\\1\n#{macos_dependencies.join("\n")}\n",
-              )
-            end
-            File.write(path, formula)
-          RUBY
-          for attempt in 1 2 3 4 5 6; do
-            if brew update-python-resources --ignore-main-package-cooldown --exclude-packages pillow --package-name mangapy --version "${VERSION}" "${formula_path}"; then
-              exit 0
-            fi
-            echo "PyPI resources not available yet; retrying (${attempt}/6)"
-            sleep 10
-          done
-          echo "Could not refresh Python resources after 6 attempts; refusing to publish stale dependencies." >&2
-          exit 1
-        env:
-          ARCHIVE_URL: ${{ steps.meta.outputs.archive_url }}
-          ARCHIVE_SHA256: ${{ steps.archive.outputs.sha256 }}
-          VERSION: ${{ steps.meta.outputs.version }}
+          ruby -c Formula/mangapy.rb
 
       - name: Open or update Homebrew formula pull request
         working-directory: homebrew-tap
