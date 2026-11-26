@@ -41,7 +41,7 @@ private let imageTypes: Set<String> = [
     UTType.webP.identifier, UTType.bmp.identifier, UTType.tiff.identifier,
 ]
 
-func decodeImage(_ data: Data, orient: Bool = false) throws -> CGImage {
+private func decodedImage(_ data: Data, orient: Bool) throws -> (image: CGImage, isJPEG: Bool, orientation: Int) {
     guard let source = CGImageSourceCreateWithData(data as CFData, nil),
           let type = CGImageSourceGetType(source), imageTypes.contains(type as String),
           CGImageSourceGetStatus(source) == .statusComplete else {
@@ -64,7 +64,17 @@ func decodeImage(_ data: Data, orient: Bool = false) throws -> CGImage {
     guard let image, CGImageSourceGetStatusAtIndex(source, 0) == .statusComplete else {
         throw MangapyError("Invalid image")
     }
-    return image
+    return (image, type as String == UTType.jpeg.identifier, orientation)
+}
+
+func decodeImage(_ data: Data, orient: Bool = false) throws -> CGImage {
+    try decodedImage(data, orient: orient).image
+}
+
+func validatePage(_ data: Data, forPDF: Bool) throws -> ValidatedJPEG? {
+    let (image, isJPEG, orientation) = try decodedImage(data, orient: false)
+    guard forPDF, isJPEG, orientation == 1 else { return nil }
+    return ValidatedJPEG(data, image: image)
 }
 
 func pdfPageCount(_ url: URL) -> Int? {
@@ -73,21 +83,17 @@ func pdfPageCount(_ url: URL) -> Int? {
     return pdf.numberOfPages
 }
 
-func writePDF(_ images: [URL], to target: URL) throws {
+func writePDF(_ images: [URL], to target: URL, jpegPages: [URL: ValidatedJPEG] = [:]) throws {
     let temporary = target.deletingLastPathComponent().appendingPathComponent(".\(UUID().uuidString).pdf")
     defer { try? FileManager.default.removeItem(at: temporary) }
-    guard let pdf = CGContext(temporary as CFURL, mediaBox: nil, nil) else {
-        throw MangapyError("Could not create PDF")
+    let jpeg = images.compactMap { jpegPages[$0] }
+    // Quartz handles the whole chapter when any page needs decoding or orientation.
+    if jpeg.isEmpty || jpeg.count != images.count {
+        try writeQuartzPDF(images, to: temporary)
+    } else if try !writeJPEGChapter(zip(images, jpeg), to: temporary) {
+        try FileManager.default.removeItem(at: temporary)
+        try writeQuartzPDF(images, to: temporary)
     }
-    for item in images {
-        let image = try decodeImage(Data(contentsOf: item, options: .mappedIfSafe), orient: true)
-        var page = CGRect(x: 0, y: 0, width: CGFloat(image.width) * 0.72, height: CGFloat(image.height) * 0.72)
-        let box = withUnsafeBytes(of: &page) { Data($0) }
-        pdf.beginPDFPage([kCGPDFContextMediaBox: box] as CFDictionary)
-        pdf.draw(image, in: page)
-        pdf.endPDFPage()
-    }
-    pdf.closePDF()
     guard pdfPageCount(temporary) == images.count else { throw MangapyError("PDF page count mismatch") }
     let file = try FileHandle(forWritingTo: temporary)
     defer { try? file.close() }
@@ -97,6 +103,21 @@ func writePDF(_ images: [URL], to target: URL) throws {
         target.withUnsafeFileSystemRepresentation { rename(source!, $0!) }
     }
     guard status == 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+}
+
+private func writeQuartzPDF(_ images: [URL], to temporary: URL) throws {
+    guard let pdf = CGContext(temporary as CFURL, mediaBox: nil, nil) else {
+        throw MangapyError("Could not create PDF")
+    }
+    defer { pdf.closePDF() }
+    for item in images {
+        let image = try decodeImage(Data(contentsOf: item, options: .mappedIfSafe), orient: true)
+        var page = CGRect(x: 0, y: 0, width: CGFloat(image.width) * 0.72, height: CGFloat(image.height) * 0.72)
+        let box = withUnsafeBytes(of: &page) { Data($0) }
+        pdf.beginPDFPage([kCGPDFContextMediaBox: box] as CFDictionary)
+        pdf.draw(image, in: page)
+        pdf.endPDFPage()
+    }
 }
 
 func batchResults<Item: Sendable, Output: Sendable>(
@@ -142,9 +163,9 @@ struct Archiver: Sendable {
         let folder = try directory(root.appendingPathComponent(pdf ? ".images" : "images", isDirectory: true))
         let chapterDir = try directory(folder.appendingPathComponent(name, isDirectory: true))
         let paths = pages.enumerated().map { pagePath(in: chapterDir, index: $0.offset, url: $0.element) }
-        let downloaded = try await download(pages: pages, paths: paths)
+        let (downloaded, jpegPages) = try await download(pages: pages, paths: paths)
         if let pdfPath {
-            try writePDF(paths, to: pdfPath)
+            try writePDF(paths, to: pdfPath, jpegPages: jpegPages)
             for path in paths {
                 do { try FileManager.default.removeItem(at: path) }
                 catch { writeError("Could not remove temporary page \(path.path): \(error.localizedDescription)") }
@@ -157,9 +178,10 @@ struct Archiver: Sendable {
         return downloaded ? .downloaded : .existing
     }
 
-    private func download(pages: [URL], paths: [URL]) async throws -> Bool {
+    private func download(pages: [URL], paths: [URL]) async throws -> (Bool, [URL: ValidatedJPEG]) {
         let jobs = Array(zip(pages, paths))
         var downloaded = false
+        var jpegPages: [URL: ValidatedJPEG] = [:]
         var failures: [String] = []
         for start in stride(from: 0, to: jobs.count, by: pageWorkers) {
             try Task.checkCancellation()
@@ -167,7 +189,9 @@ struct Archiver: Sendable {
             let results = await batchResults(batch) { try await fetch($0.0, to: $0.1) }
             for ((_, path), result) in zip(batch, results) {
                 switch result {
-                case .success(let new): downloaded = downloaded || new
+                case .success(let (new, jpeg)):
+                    downloaded = downloaded || new
+                    jpegPages[path] = jpeg
                 case .failure(let error): failures.append("\(path.path): \(error.localizedDescription)")
                 }
             }
@@ -176,18 +200,21 @@ struct Archiver: Sendable {
         if !failures.isEmpty {
             throw MangapyError("\(failures.count) of \(paths.count) pages failed: \(failures.joined(separator: "; "))")
         }
-        return downloaded
+        return (downloaded, jpegPages)
     }
 
-    private func fetch(_ url: URL, to path: URL) async throws -> Bool {
+    private func fetch(_ url: URL, to path: URL) async throws -> (Bool, ValidatedJPEG?) {
         if try regularFileExists(path), !force,
-           let cached = try? Data(contentsOf: path, options: .mappedIfSafe), (try? decodeImage(cached)) != nil {
-            return false
+           let cached = try? Data(contentsOf: path, options: .mappedIfSafe) {
+            if case .success(let jpeg) = Result(catching: { try validatePage(cached, forPDF: pdf) }) {
+                return (false, jpeg)
+            }
         }
         let data = try await http.get(url, headers: provider.headers(for: url))
-        do { _ = try decodeImage(data) }
+        let jpeg: ValidatedJPEG?
+        do { jpeg = try validatePage(data, forPDF: pdf) }
         catch { throw MangapyError("Invalid image for \(path.path)") }
         try data.write(to: path, options: .atomic)
-        return true
+        return (true, jpeg)
     }
 }

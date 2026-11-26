@@ -1,9 +1,9 @@
 # Swift development
 
 The SwiftPM package builds an arm64 or x86_64 macOS executable for the host
-architecture. It requires Swift 6 with the macOS SDK and targets macOS 13 or
-later. Swift Testing needs macOS 14 or later. TLS connections to a proxy also
-require macOS 14 or later.
+architecture. It requires Swift 6.4 or later with the macOS SDK and targets
+macOS 13 or later. Swift Testing and TLS connections to a proxy require
+macOS 14 or later.
 
 ```sh
 swift build -c release --disable-automatic-resolution

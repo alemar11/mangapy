@@ -55,7 +55,7 @@ and put the executable on your `PATH`.
 
 ### Build from source
 
-The native Swift CLI requires macOS 13 or later and a Swift 6.0 or later
+The native Swift CLI requires macOS 13 or later and a Swift 6.4 or later
 toolchain with the macOS SDK. Build it with SwiftPM:
 
 ```console

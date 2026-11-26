@@ -132,9 +132,11 @@ private func checkLock(_ root: URL, ledger: LockLedger) async throws {
     }
 }
 
-func fixtureImage(type: UTType = .png, orientation: Int = 1, red: Bool = false) -> Data {
+func fixtureImage(type: UTType = .png, orientation: Int = 1, red: Bool = false,
+                  space: CGColorSpace = CGColorSpaceCreateDeviceRGB()) -> Data {
+    let alpha = space.model == .monochrome ? CGImageAlphaInfo.none : .premultipliedLast
     let context = CGContext(data: nil, width: 4, height: 6, bitsPerComponent: 8, bytesPerRow: 0,
-                            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+                            space: space, bitmapInfo: alpha.rawValue)!
     context.setFillColor(red: red ? 1 : 0, green: 0.2, blue: 0.8, alpha: 1)
     context.fill(CGRect(x: 0, y: 0, width: 4, height: 6))
     let data = NSMutableData()
@@ -149,13 +151,18 @@ func fixtureImage(type: UTType = .png, orientation: Int = 1, red: Bool = false) 
     defer { try? FileManager.default.removeItem(at: output) }
     let first = output.appendingPathComponent("first.jpg")
     let second = output.appendingPathComponent("second.png")
+    let third = output.appendingPathComponent("third.jpg")
     let destination = output.appendingPathComponent("chapter.pdf")
     let jpeg = fixtureImage(type: .jpeg, orientation: 6)
+    let upright = fixtureImage(type: .jpeg)
     try jpeg.write(to: first)
     try fixtureImage().write(to: second)
-    try writePDF([first, second], to: destination)
+    try upright.write(to: third)
+    let validated = [third: try #require(try validatePage(upright, forPDF: true))]
+    #expect(try validatePage(jpeg, forPDF: true) == nil)
+    try writePDF([first, second, third], to: destination, jpegPages: validated)
     let pdf = try #require(CGPDFDocument(destination as CFURL))
-    #expect(pdf.numberOfPages == 2)
+    #expect(pdf.numberOfPages == 3)
     let page = try #require(pdf.page(at: 1)).getBoxRect(.mediaBox)
     let next = try #require(pdf.page(at: 2)).getBoxRect(.mediaBox)
     #expect(abs(page.width - next.height) < 0.001)
@@ -163,7 +170,74 @@ func fixtureImage(type: UTType = .png, orientation: Int = 1, red: Bool = false) 
     #expect(throws: MangapyError.self) { try decodeImage(Data(jpeg.dropLast(jpeg.count / 2))) }
     let original = try Data(contentsOf: destination)
     try Data("corrupt".utf8).write(to: second)
-    #expect(throws: MangapyError.self) { try writePDF([first, second], to: destination) }
+    #expect(throws: MangapyError.self) { try writePDF([first, second, third], to: destination, jpegPages: validated) }
     #expect(try Data(contentsOf: destination) == original)
-    #expect(try FileManager.default.contentsOfDirectory(atPath: output.path).count == 3)
+    #expect(try FileManager.default.contentsOfDirectory(atPath: output.path).count == 4)
+}
+
+@Test func directPDFPreservesJPEGBytesColorAndOrder() throws {
+    let output = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: output) }
+    let spaces = [CGColorSpace(name: CGColorSpace.displayP3)!,
+                  CGColorSpace(name: CGColorSpace.genericGrayGamma2_2)!]
+    var jpeg = spaces.map { fixtureImage(type: .jpeg, red: true, space: $0) }
+    // Some encoders append extra data to the Adobe APP14 segment after the transform.
+    let adobeMarker: [UInt8] = [
+        0xff, 0xee, 0, 16, 65, 100, 111, 98, 101, 0, 100, 0, 0, 0, 0, 1, 0xff, 0,
+    ]
+    jpeg[0].insert(contentsOf: adobeMarker, at: 2)
+    let paths = [output.appendingPathComponent("b.jpg"), output.appendingPathComponent("a.jpg")]
+    var validated: [URL: ValidatedJPEG] = [:]
+    for (path, data) in zip(paths, jpeg) {
+        try data.write(to: path)
+        let descriptor = try validatePage(data, forPDF: true)
+        let supported: ValidatedJPEG = try #require(descriptor)
+        validated[path] = supported
+    }
+    let direct = output.appendingPathComponent("direct.pdf")
+    let quartz = output.appendingPathComponent("quartz.pdf")
+    try writePDF(paths, to: direct, jpegPages: validated)
+    try writePDF(paths, to: quartz)
+    let directPDF = try #require(CGPDFDocument(direct as CFURL))
+    let quartzPDF = try #require(CGPDFDocument(quartz as CFURL))
+    #expect(directPDF.numberOfPages == 2)
+    for (index, data) in jpeg.enumerated() {
+        let page = try #require(directPDF.page(at: index + 1))
+        let reference = try #require(quartzPDF.page(at: index + 1))
+        #expect(page.getBoxRect(.mediaBox) == reference.getBoxRect(.mediaBox))
+        var resources: CGPDFDictionaryRef?
+        var objects: CGPDFDictionaryRef?
+        var image: CGPDFStreamRef?
+        let dictionary = try #require(page.dictionary)
+        try #require(CGPDFDictionaryGetDictionary(dictionary, "Resources", &resources))
+        let resourcesDictionary = try #require(resources)
+        try #require(CGPDFDictionaryGetDictionary(resourcesDictionary, "XObject", &objects))
+        let objectDictionary = try #require(objects)
+        try #require(CGPDFDictionaryGetStream(objectDictionary, "Im", &image))
+        let imageStream = try #require(image)
+        var format = CGPDFDataFormat.raw
+        let bytes = try #require(CGPDFStreamCopyData(imageStream, &format)) as Data
+        #expect(format == .jpegEncoded)
+        #expect(bytes == data)
+        #expect(try renderPDFPage(page) == renderPDFPage(reference))
+    }
+
+    // A cached description must not authorize bytes changed since validation.
+    let original = try Data(contentsOf: direct)
+    try Data("broken".utf8).write(to: paths[1])
+    #expect(throws: MangapyError.self) { try writePDF(paths, to: direct, jpegPages: validated) }
+    #expect(try Data(contentsOf: direct) == original)
+    #expect(try FileManager.default.contentsOfDirectory(atPath: output.path).count == 4)
+}
+
+private func renderPDFPage(_ page: CGPDFPage) throws -> Data {
+    let width = 32
+    let height = 48
+    let context = try #require(CGContext(data: nil, width: width, height: height, bitsPerComponent: 8,
+                                         bytesPerRow: width * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                         bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+    let rect = CGRect(x: 0, y: 0, width: width, height: height)
+    context.concatenate(page.getDrawingTransform(.mediaBox, rect: rect, rotate: 0, preserveAspectRatio: false))
+    context.drawPDFPage(page)
+    return Data(bytes: try #require(context.data), count: width * height * 4)
 }

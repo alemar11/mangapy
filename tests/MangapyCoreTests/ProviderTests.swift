@@ -1,34 +1,39 @@
 import Foundation
+import os
 import Testing
 @testable import MangapyCore
 
-private final class FixtureRoutes: @unchecked Sendable {
+private struct FixtureRoutes: Sendable {
     typealias Handler = @Sendable (URLRequest, Int) -> (Int, [String: String], Data)
 
-    private let lock = NSLock()
-    private var routes: [String: Handler] = [:]
-    private var counts: [String: Int] = [:]
+    private struct State: Sendable {
+        var routes: [String: Handler] = [:]
+        var counts: [String: Int] = [:]
+    }
+
+    private let lock = OSAllocatedUnfairLock(initialState: State())
 
     func register(_ host: String, handler: @escaping Handler) {
-        lock.withLock { routes[host] = handler }
+        lock.withLock { $0.routes[host] = handler }
     }
 
     func count(_ host: String, path: String) -> Int {
-        lock.withLock { counts[host + path, default: 0] }
+        lock.withLock { $0.counts[host + path, default: 0] }
     }
 
     func respond(_ request: URLRequest) -> (Int, [String: String], Data) {
         let host = request.url!.host!
-        let path = request.url!.path
-        let (route, count) = lock.withLock {
-            counts[host + path, default: 0] += 1
-            return (routes[host], counts[host + path]!)
+        let key = host + request.url!.path
+        let (route, count) = lock.withLock { state in
+            let count = state.counts[key, default: 0] + 1
+            state.counts[key] = count
+            return (state.routes[host], count)
         }
         return route?(request, count) ?? (404, [:], Data())
     }
 }
 
-private final class FixtureProtocol: URLProtocol, @unchecked Sendable {
+private final class FixtureProtocol: URLProtocol {
     static let routes = FixtureRoutes()
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
