@@ -55,6 +55,17 @@ and put the executable on your `PATH`.
 
 ### Build from source
 
+The native Swift CLI requires macOS 13 or later and a Swift 6.0 or later
+toolchain with the macOS SDK. Build it with SwiftPM:
+
+```console
+swift build -c release --disable-automatic-resolution
+.build/release/mangapy --version
+.build/release/mangapy title "Backstage Lovers" -s mangadex -c 5 --pdf
+```
+
+The Rust reference implementation remains buildable:
+
 ```console
 cargo install --locked --path .
 mangapy --version
@@ -268,7 +279,7 @@ More ready-to-run configurations are available in [`samples/`](samples/). To
 run one directly from a source checkout:
 
 ```console
-cargo run --locked -- yaml samples/sample.yaml
+swift run --disable-automatic-resolution mangapy yaml samples/sample.yaml
 ```
 
 ## Configuration
@@ -293,6 +304,17 @@ local pages match the provider response.
 | `130` | The download was interrupted by the user. |
 
 ## Development setup
+
+For Swift, run the offline suite and opt in to provider tests when needed:
+
+```console
+swift test --disable-automatic-resolution
+MANGAPY_LIVE_TESTS=1 swift test --disable-automatic-resolution --no-parallel --filter Live
+```
+
+See [Swift development](docs/Swift.md) for the port's layout and archive behavior.
+
+For the Rust reference implementation:
 
 Install stable Rust with [rustup](https://rustup.rs/) or run `mise install`.
 
